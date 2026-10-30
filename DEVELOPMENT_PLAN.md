@@ -626,6 +626,130 @@ This section answers the original real-production/system-design request. It is *
 | Content/localization | Product/content: locales, time zones, RTL, plural rules, currencies, legal copy. |
 | Feature delivery | Product/platform: flags, cohorts, kill switch, experiment rules, compatibility, rollout and rollback ownership. |
 
+### Backend collaboration contract for production transfers
+
+This is production guidance for a future real API. It does **not** change the
+supplied assessment API, request types, MSW handlers, seed data, or optional
+Node mock.
+
+The assessment frontend already prevents rapid duplicate activation in one
+mounted dialog, does not automatically retry the mutation, and validates a
+cached balance and limit for immediate feedback. The supplied mock also checks
+its current in-memory balance and daily limit immediately before mutation.
+Those controls are sufficient for the exercise, but they are not a production
+financial guarantee: the client is untrusted, the snapshot can become stale,
+the mock has no authenticated principal or durable transaction, and its
+documented contract deliberately moves money twice when the same request is
+submitted twice.
+
+Use the precise production concerns below—atomicity, isolation, idempotency,
+authorization, replay prevention, and reconciliation—rather than treating
+"thread-safe frontend" as the target.
+
+#### Responsibility boundary
+
+| Owner | Required guarantee |
+| --- | --- |
+| Frontend | Validate for UX, create one idempotency key per confirmed user intent, reuse it for every retry/status check, prevent accidental repeat activation, preserve an `unknown` outcome after ambiguous failures, and never claim money did or did not move without authoritative evidence. |
+| Identity/BFF/security | Terminate HTTPS, authenticate the principal, manage secure sessions/tokens, enforce CSRF/origin/CORS policy, rate limits and step-up challenges, and pass a verified identity—not a client-supplied customer identity—to the transfer service. |
+| Transfer/payments service | Authorize account ownership and transfer entitlement, validate recipient/risk/limits against current server data, enforce idempotency, orchestrate the atomic write, own the transfer state machine, and return a stable canonical result. |
+| Database/platform | Provide exact money types, uniqueness constraints, isolation/locking or compare-and-swap primitives, all-or-nothing ledger writes, durable audit/outbox records, backup/recovery, and multi-instance correctness. |
+| Risk/compliance/SRE | Define step-up thresholds, fraud/AML controls, audit retention, reconciliation, operational limits, observability, incident handling, and safe manual recovery. |
+| Frontend/backend contract owners | Maintain the versioned OpenAPI/schema, generated types where useful, error and retry taxonomy, compatibility policy, and consumer/provider contract tests. |
+
+#### Proposed production API semantics
+
+These are contract proposals to resolve jointly before integrating a real
+backend, not fields to add unilaterally to the assessment endpoint.
+
+| Concern | Proposed contract |
+| --- | --- |
+| Authentication | Derive the customer/principal from a verified session or access token. Never accept a customer identity in the transfer body as authority. |
+| Authorization | Verify source-account ownership, payee access, product entitlement, currency, transfer capability and risk policy on every request. Return `401` for missing/invalid authentication and the agreed `403` or privacy-preserving `404` for denied resources. Neither response may mutate state. |
+| Idempotency | Require an `Idempotency-Key` scoped to the authenticated principal. Persist a unique `(principal_id, key)`, request hash, lifecycle state and canonical response. Same key/same payload returns the existing result; same key/different payload returns `409`. Define key format, TTL and archival policy. |
+| Money | Send currency plus integer minor units or a documented exact-decimal representation. Reject floats, unsupported currencies, overflow, invalid scale and non-positive values. Agree rounding and fee semantics. |
+| Transfer identity/state | Return a stable transfer ID and explicit state such as `pending`, `completed`, `failed`, `reversed` or `cancelled`. Define which state makes funds movement authoritative and which transitions are legal. |
+| Validation/errors | Backend balance, daily limit, account state and risk checks are authoritative. Version stable machine codes and field paths separately from user-facing copy. Define `401`, `403/404`, `409`, `422`, `429` and `5xx` retry behavior. |
+| Reconciliation | Provide idempotent replay and/or `GET /transfers/{id}` / lookup-by-idempotency-key. A timeout is `unknown`, not failure; the client reuses the original key and reconciles instead of creating a new intent. |
+| Observability | Propagate a privacy-safe correlation ID and record security/audit facts server-side. Never log full account numbers, tokens, credentials or sensitive transfer notes. |
+
+#### Atomic backend processing
+
+For each authenticated transfer intent, the backend should complete the
+following within one database transaction (or an equivalently proven ledger
+primitive):
+
+1. Validate the request shape and exact money representation.
+2. Reserve/read the idempotency record under a unique principal/key constraint;
+   return the stored canonical result for a matching completed request and
+   reject a mismatched request hash.
+3. Lock the source account and daily-limit/risk rows with serializable
+   isolation or `SELECT ... FOR UPDATE`, or use atomic conditional updates and
+   verify the affected-row count.
+4. Re-read the current account state, available balance, limit usage,
+   recipient status and authorization inside that transaction. Client values
+   are hints only.
+5. Reject insufficient funds or limits without any mutation.
+6. Write the debit/credit double-entry ledger records, transfer state, limit
+   usage, idempotency result, immutable audit event and transactional outbox as
+   one all-or-nothing unit.
+7. Commit before reporting an authoritative result. Any exception rolls back
+   every financial write.
+8. Publish external events from the outbox and reconcile downstream/provider
+   state. Propagate the same idempotency identity where the provider supports
+   it.
+9. On response loss or timeout, return the same stored result when the client
+   retries with the original key; never debit again.
+
+An atomic conditional debit such as `UPDATE ... WHERE balance_minor >=
+amount_minor` is a useful final constraint, but it does not replace the ledger,
+idempotency, authorization, daily-limit and audit transaction.
+
+#### Authentication and interaction security
+
+- Require HTTPS/HSTS in every non-local environment.
+- Prefer OIDC Authorization Code + PKCE with a BFF and an opaque `Secure`,
+  `HttpOnly`, appropriately `SameSite` session cookie for a browser banking
+  application. Do not store long-lived banking bearer tokens in
+  `localStorage`.
+- For cookie sessions, require CSRF protection and strict `Origin`/`Referer`
+  validation; use an exact CORS allowlist. For token APIs, validate signature,
+  issuer, audience, expiry, scopes and revocation policy server-side.
+- Bind step-up authentication or transaction signing to the source, recipient,
+  amount, currency, nonce and short expiry where risk policy requires it.
+- Apply throttling, replay/fraud detection, device/session risk, secret
+  rotation, privacy-safe security telemetry and immutable audit controls.
+- Treat XSS prevention and dependency/supply-chain controls as part of session
+  protection; authentication headers do not make a compromised browser safe.
+
+#### Joint frontend/backend acceptance tests
+
+| Scenario | Required evidence |
+| --- | --- |
+| Concurrent unique transfers exceed the available balance | Run requests in parallel against the real database/multiple service instances; allowed requests commit, later contenders see current state, the balance never becomes invalid, and ledger totals reconcile. |
+| Concurrent requests exceed the daily limit | The committed total never exceeds the authoritative limit and rejected requests create no ledger movement. |
+| Same key and same payload is submitted concurrently or retried | Exactly one financial movement, transfer, audit/outbox record and limit update exist; every caller receives the same canonical transfer result. |
+| Same key with a different payload | Return `409`; create no additional state or financial movement. |
+| Response is lost after commit | Retrying/reconciling with the original key returns the committed result and never debits twice. |
+| Client uses stale balance or limit | The backend rejects authoritatively with the current safe metadata/error code; no partial mutation occurs. |
+| Unauthenticated or unauthorized account request | Return the agreed `401`/`403`/`404`; create no transfer, ledger, successful-transfer audit/outbox or limit movement. A denied-attempt security audit may still be required. |
+| Failure injected between proposed writes | The database transaction rolls back completely, or a deliberately pending external state is durable and reconcilable; partial ledger/account/limit state is impossible. |
+| Money boundaries | Test scale, rounding, minimum/maximum, overflow, currency mismatch and fee/total invariants using exact representations. |
+| Multi-instance/restart behavior | Idempotency, locking, state transitions and reconciliation remain correct across service instances, process termination and retry. |
+| Audit and outbox | Successful state is recorded exactly once with privacy-safe identity/correlation; failed/denied attempts follow the security retention policy. |
+
+#### Open collaboration decisions
+
+| Decision | Primary owners | Closure evidence | Status |
+| --- | --- | --- | --- |
+| OIDC/BFF versus direct token model; session, CSRF and step-up policy | Security, identity, frontend, backend | Threat model and approved sequence diagrams | Open before real API implementation |
+| Idempotency key scope, request hash, TTL and status lookup | Payments/backend, frontend, data | Versioned API contract and concurrency tests | Open before mutation integration |
+| Database isolation/locking/conditional-write strategy | Payments/backend, data/platform | Load/fault tests against production-like database topology | Open before production readiness |
+| Money representation, limits, fees and rounding | Payments, finance/domain, backend, frontend | Domain specification and boundary test vectors | Open before contract freeze |
+| Transfer states, ambiguous timeout UX and reconciliation | Product, payments/backend, frontend, SRE | State machine, recovery runbook and E2E scenarios | Open before UX/API sign-off |
+| Error taxonomy and authorization privacy behavior | Security, backend, frontend, content | OpenAPI examples and consumer/provider tests | Open before contract freeze |
+| Audit, outbox, monitoring and incident ownership | Risk/compliance, backend, SRE | Retention policy, dashboards/alerts and recovery exercise | Open before launch |
+
 ### Real development environment
 
 - Pin runtime/package-manager versions and enforce the lockfile in local and CI environments.

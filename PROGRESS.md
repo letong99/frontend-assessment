@@ -82,6 +82,13 @@ Last updated: 2026-10-30 (Asia/Singapore)
 - Made the dashboard render state exhaustive: pending data shows skeletons, complete data shows content, and any settled state missing required data shows the Retry error. A background refetch error with prior data keeps that data visible.
 - Added four API-boundary unit tests plus dashboard tests for initial HTML fallback/recovery and the exact loaded-dashboard background-refetch failure.
 
+### 2026-10-30 — backend collaboration safeguards documented
+
+- Kept every supplied endpoint, request type, mock handler and seed record unchanged.
+- Expanded the production appendix with a joint frontend/backend transfer-safety contract covering responsibility boundaries, authoritative validation, atomic database processing, idempotency and replay behavior, exact money, authentication/authorization, ambiguous outcomes, audit/outbox/reconciliation, and multi-instance correctness.
+- Added production acceptance scenarios for concurrent funds/limit contention, duplicate requests, lost responses, stale client data, unauthorized access, injected partial failures, money boundaries and exactly-once audit/outbox effects.
+- Recorded the open decisions and accountable disciplines that must close them before a real transfer API is integrated.
+
 ## Decisions
 
 | ID | Decision | Reason | Status |
@@ -106,6 +113,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | D-018 | Derive customer identity shown in the dashboard from the customer API response. | The seed currently contains Ava, but personalization must follow server data rather than a component literal. | Active |
 | D-019 | Enforce the supplied API's top-level JSON-object contract at the shared fetch boundary. | Vite's SPA fallback is HTTP 200 HTML; accepting a parse failure as successful `null` data corrupts query state silently. | Active |
 | D-020 | Make dashboard rendering exhaustive based on pending state and complete required data. | No settled query-state combination should render only the header; prior data remains useful during a background failure. | Active |
+| D-021 | Keep the supplied assessment endpoints unchanged and document production transaction safety/authentication as a backend-collaboration contract. | Frontend locking is a UX safeguard; atomicity, authoritative validation, authorization, idempotency and reconciliation require an agreed backend boundary. | Active |
 
 ## Problems and investigations
 
@@ -123,6 +131,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | P-010 | An induced post-success refetch failure initially replaced the populated dashboard with its initial-load error underneath the success dialog. | It created a second alert and discarded useful stale data during a recoverable background failure. | The dashboard now renders its full error only when a failed query has no data; the transfer warning and retry remain responsible for synchronization recovery. | Resolved |
 | P-011 | The dashboard greeting embedded `Ava` directly in JSX. | A different signed-in customer response would still display the seed customer's name. | Passed the typed `Customer` object into the dashboard content and rendered `customer.firstName`; added a non-Ava API regression test. | Resolved |
 | P-012 | After an idle tab refetched, an un-intercepted `/api/*` request could receive Vite's 200 HTML fallback; JSON parsing was swallowed and `null` cached as successful data. | The dashboard matched neither loading, error, nor content and displayed only its header. | Reject invalid successful responses at `apiFetch`, preserve last good query data on refetch failure, and route missing settled data to Retry. | Resolved |
+| P-013 | The assessment mock has no authentication, durable atomic transaction or idempotency; its contract permits the same request to move money twice. | It must never be represented as safe for real financial processing, and frontend controls cannot close that trust gap. | Left the assessment implementation unchanged and captured owners, proposed production semantics, processing invariants and joint acceptance tests in `DEVELOPMENT_PLAN.md` §13. | Deferred to real backend collaboration |
 
 ## Verification evidence
 

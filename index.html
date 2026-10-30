@@ -3,8 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f4f6fa" />
     <title>Meridian Banking</title>
+    <script>
+      ;(() => {
+        const root = document.documentElement
+        let storedTheme = null
+        let storedSegment = null
+
+        try {
+          storedTheme = window.localStorage.getItem('meridian-theme')
+          storedSegment = window.localStorage.getItem('meridian-segment')
+        } catch {
+          // Storage can be unavailable in restricted browser contexts. The
+          // application still follows system/default preferences in that case.
+        }
+
+        const theme =
+          storedTheme === 'light' || storedTheme === 'dark'
+            ? storedTheme
+            : typeof window.matchMedia === 'function' &&
+                window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light'
+        const segment =
+          storedSegment === 'retail' || storedSegment === 'premium'
+            ? storedSegment
+            : 'retail'
+
+        root.dataset.theme = theme
+        root.dataset.segment = segment
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

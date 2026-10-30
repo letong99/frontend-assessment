@@ -1,0 +1,55 @@
+.preference-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.segment-switch {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  padding: var(--space-1);
+}
+
+.segment-switch button,
+.theme-toggle {
+  border: 0;
+  cursor: pointer;
+  min-height: var(--tap-target);
+}
+
+.segment-switch button {
+  background: transparent;
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  padding: 0 var(--space-3);
+}
+
+.segment-switch button[aria-pressed='true'] {
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: var(--weight-semibold);
+}
+
+.theme-toggle {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text);
+  display: inline-flex;
+  justify-content: center;
+  min-width: var(--tap-target);
+}
+
+.visually-hidden {
+  block-size: 1px;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}

@@ -1,135 +1,192 @@
-# Meridian Banking — Frontend Take-Home
+# Meridian Banking — Frontend Assessment
 
-Build a small banking app for one customer: a **dashboard** that shows her
-accounts and recent transactions, and a **three-step transfer** that sends money
-to a payee.
+- Deployed: pending hosting setup and merge to `main`
+- Active implementation branch: `feat/meridian-app`
+- Run locally: `npm ci && npm run dev`
 
-You get a working React + TypeScript starter with a mock API already wired in,
-plus design tokens and a wireframe. You don't need a backend, and you don't need
-to invent data.
+Meridian is a responsive, accessible banking dashboard for Ava Chen. It shows
+her accounts and eight newest transactions by default, can page through the
+complete supplied transaction history, supports local transaction search,
+light/dark and Retail/Premium preferences, and a complete three-step transfer
+flow backed by the supplied in-browser mock API.
 
-|  |  |
-| --- | --- |
-| **Time** | Submit within **2 weeks** of receiving this. Most people need about **8–12 hours**; you don't need to use the full two weeks. |
-| **AI tools** | Allowed. In the follow-up call you explain your code and change it live, **without AI help**. See [How we assess](#4-how-we-assess). |
-| **Stack** | React 19, TypeScript, Vite, TanStack Query, React Hook Form, Zod, MSW, Vitest (all installed). Node 22. |
+## Run locally
 
----
-
-## 1. Get started
-
-1. Open **https://github.com/Harmonice-Mundi/2026-fe-assignment/generate**
-   (or press **Use this template** → **Create a new repository**). Choose your
-   own account as the owner, keep it **Public**, and click **Create
-   repository**.
-2. Clone your copy and run:
-
-   ```bash
-   npm install
-   npm run dev        # http://localhost:5173
-   ```
-
-   You should see **"Mock API: connected"**. That screen is a placeholder;
-   replace it with your app.
-
-3. Read the docs below in order before writing code.
-
-## 2. What to read
-
-| Read | What it gives you |
-| --- | --- |
-| 1. [`brief/candidate-brief.md`](brief/candidate-brief.md) | **The spec.** What to build, what's required vs optional, exact copy. |
-| 2. [`wireframes/wireframe.md`](wireframes/wireframe.md) | Layout of each screen (low fidelity — no visual design). |
-| 3. [`brief/api-contract.md`](brief/api-contract.md) | Endpoints, types, errors, and test hooks. |
-
-Look these up when you need them:
-
-- [`DEPLOYMENT.md`](DEPLOYMENT.md): hosting settings and fixes for common mock-API
-  problems.
-- [`brief/design-tokens.css`](brief/design-tokens.css): colours, spacing and type
-  (already imported).
-- [`mock-api/README.md`](mock-api/README.md): the optional Node mock server.
-
-## 3. What's already in the starter
-
-| Path | What it is |
-| --- | --- |
-| `src/api/client.ts`, `src/api/types.ts` | Typed `apiFetch` helper and the API types. Build your queries on these. |
-| `src/lib/format.ts` | `formatMoney` and `formatShortDate`. Use them so amounts and dates match the brief. |
-| `src/mocks/`, `mock-api/` | The mock API. It runs in the browser, in tests, and in your deployed site. **Don't edit it.** |
-| `src/test/setup.ts` | Test setup. The mock data resets before every test. |
-| `src/App.tsx` | Placeholder screen. Replace it. |
-
-How you structure folders, components and features is **up to you** — that's
-part of what we look at.
+Node 22 is recommended (the project requires Node 20 or newer).
 
 ```bash
-npm run dev        # start the app
-npm test           # run tests once (npm run test:watch to keep watching)
-npm run lint       # ESLint
-npm run typecheck  # TypeScript
-npm run check      # lint + typecheck + tests
-npm run build      # production build into dist/
+npm ci
+npm run dev
 ```
 
-Run `npm run check` and `npm run build` before you submit; both should pass.
+Vite prints the local URL, normally `http://localhost:5173`. The app starts the
+MSW worker before rendering, so no separate backend is required.
 
-## 4. How we assess
+Useful commands:
 
-1. **We open your deployed app** and run through the flows in the brief.
-2. **We read your code and README.** We look at how you structured the
-   project, the decisions you made, and whether the tests check real behaviour.
-3. **We have a follow-up call with you (about 45 minutes).** You share your
-   screen and:
-   - walk us through the structure and two or three decisions you made;
-   - trace one flow through the code (for example, what happens from
-     `Confirm transfer` until the balance updates);
-   - make **one or two small changes live**, without AI assistance. They are
-     the size of "add a validation rule" or "show one more field". Your
-     normal editor, docs and search are fine.
+```bash
+npm run check       # ESLint + strict TypeScript + Vitest
+npm run build       # production output in dist/
+npm run preview     # serve the production build locally
+npm run test:watch  # Vitest watch mode
+```
 
-**On AI:** use whatever tools you like while building. We are not checking
-whether code was AI-generated. We are checking that **you understand all of
-it** and made deliberate choices. If you can't explain a piece of code, it
-counts against you, whoever wrote it. Your README must say what you used AI
-for (see below).
+The production artifact must include `dist/mockServiceWorker.js`; see
+[DEPLOYMENT.md](DEPLOYMENT.md) for hosting settings and the release checklist.
 
-A smaller app you understand well scores better than a bigger one you can't
-explain.
+## Requirement coverage
 
-## 5. Submit
-
-1. **Deploy** to Netlify, Vercel or Cloudflare Pages (settings in
-   [`DEPLOYMENT.md`](DEPLOYMENT.md)). The deployed site must work with no local
-   server.
-2. **Replace this README** with your own, using the outline below.
-3. **Reply to the invitation email** with your repo URL and your deployed URL.
-
-### Your README
-
-```md
-# Meridian Banking — <Your Name>
-
-- Deployed: <url>
-- Run locally: `npm install && npm run dev`
+| Area | Implemented behaviour |
+| --- | --- |
+| Dashboard (D1–D8) | Concurrent loading skeletons, exact greeting and totals, three accounts, eight newest transactions with lazy full-history pagination, local description/category search with result and empty states, retryable dashboard failure, and a one-column 360–390 px layout with a fixed transfer action. |
+| Transfer (T1–T8) | Native modal dialog, saved-payee search or new-recipient entry, amount/account/note step, review and editing, guarded POST, truthful success/failure states, dashboard refresh, linked errors, announcements, radio-keyboard semantics, and step/focus restoration. |
+| Validation | One contextual Zod schema covers recipient, account, amount, balance, daily-limit and note rules for blur and Continue/submit validation. |
+| Themes (TH1–TH3) | System-aware pre-paint theme, persistent light/dark and Retail/Premium controls, root data attributes, semantic supplied tokens, and visible focus states. |
+| Engineering (E1–E5) | Strict typed API boundary, TanStack Query server state, React Hook Form + Zod, 32 behavioural tests, passing checks, and a verified production build. |
+| Deployment (E6) | The static artifact and production MSW worker are build-ready; a public URL is still pending. |
 
 ## Project structure
-Folders and what each is responsible for.
+
+```text
+src/
+  api/                    typed API client, query functions and mutation
+  features/dashboard/     dashboard UI, responsive styles and tests
+  features/preferences/   theme/segment state, controls, styles and tests
+  features/transfer/      dialog, schema, request mapper, styles and tests
+  lib/                    supplied money/date formatters and tests
+  mocks/                  browser MSW wiring to the supplied handlers
+  test/                   shared Vitest/MSW setup and cleanup
+  App.tsx                 dashboard/transfer composition and local open state
+  main.tsx                query client, mock-worker startup and React root
+brief/                    authoritative product and API requirements
+mock-api/                 supplied stateful mock backend (unchanged)
+```
+
+Planning and implementation evidence is kept in
+[DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) and [PROGRESS.md](PROGRESS.md).
 
 ## Decisions and trade-offs
-Server state vs UI state, forms and validation, theming, anything you
-chose deliberately, and what you'd change.
+
+- **Server state:** TanStack Query owns customer, account, transaction and
+  payee data. Components do not copy responses into UI state. Query functions
+  accept cancellation signals, reads use explicit retry policies, and transfer
+  mutations never retry automatically.
+- **History and search:** the required initial view filters the eight records
+  returned by `GET /api/transactions?limit=8`. `View all` lazily requests the
+  supplied endpoint maximum (`limit=50`), then pages and searches that result
+  locally in groups of eight. This exposes all 15 supplied records without
+  changing the API or slowing the required initial load. A production ledger
+  needs cursor pagination and debounced server search beyond 50 records.
+- **Transfer consistency:** one React Hook Form instance retains values across
+  Recipient, Amount and Review. A single contextual Zod schema is the rule
+  source. The duplicate-submit lock is acquired before the first asynchronous
+  validation boundary.
+- **After a transfer:** HTTP 201 makes the success message authoritative. The
+  app then explicitly refetches customer, accounts and every active
+  transaction-list query and enables return only after synchronization
+  succeeds. A refresh failure does
+  not misreport the completed transfer as failed; it presents a separate retry.
+  Refetching was preferred over hand-patching three caches because the supplied
+  API is small and remains the source of truth.
+- **Dialog:** the platform `<dialog>` provides modal focus containment, Escape
+  handling and a backdrop without adding a component dependency. Explicit
+  heading focus and opener restoration make step transitions predictable.
+- **Preferences:** an explicit stored choice wins; otherwise theme follows the
+  system and segment reconciles to the customer response. A guarded inline
+  script applies the theme before React starts to avoid a wrong-theme flash.
+- **Scope:** no extra runtime packages or optional product features were added.
+  The existing stack covers the assessment and keeps the result explainable.
 
 ## Loading, empty and error states
-How you handled them, and how to see each one in the deployed app.
+
+- Dashboard reads start concurrently. A skeleton mirrors the final desktop
+  columns so content does not materially jump when data arrives.
+- Dashboard request failure shows `We couldn't load your dashboard.` and Retry
+  refetches all three resources. This recovery is covered by a behavioural
+  test.
+- If an un-intercepted development API request receives Vite's HTML fallback
+  with HTTP 200, the API boundary rejects it as `INVALID_RESPONSE`. An initial
+  failure reaches Retry; a background failure retains the last good dashboard.
+- No accounts, no transactions, no saved payees, no transaction-search matches
+  and no payee-search matches each have a distinct empty state. A new recipient
+  remains available when saved payees are empty.
+- If lazy full-history loading fails, the eight recent transactions remain
+  usable and an inline Retry action is shown.
+- Transfer preparation and payee loading have progress states. Payee failure
+  has its own Retry action. Backend field messages remain visible in the review
+  alert and known paths are also linked to their fields.
+- A failed transfer stays on Review with all entered data, never shows success,
+  and can be edited and retried. The exact required general failure copy is
+  used.
+
+The normal mock delay makes loading visible on reload. Search for an impossible
+term to see the search-empty state. Deliberate failures are exercised with
+per-test MSW overrides rather than a permanent "break the app" control. The
+accounts, transaction, and saved-payee empty branches are covered with scoped
+MSW response overrides; no permanent debug control ships in the main UI.
 
 ## Tests
-What they cover and why you picked those cases.
+
+Latest verified result: **30 tests in 6 files pass**, together with ESLint,
+strict TypeScript and the production build.
+
+The suite includes the three mandatory E4 behaviours:
+
+1. an over-balance amount shows its linked error, focuses the field and sends
+   no request;
+2. a successful transfer shows success and refreshes account balance, total,
+   daily limit and newest transaction;
+3. a failed dashboard request shows the required error and Retry recovers.
+
+Additional high-risk coverage includes failed-send retention and retry, rapid
+double activation producing one POST, saved-payee recovery, new-recipient
+masking/request shape, transaction search/no-match behaviour, preferences,
+validation rules, backend field mapping, dialog close/focus restoration,
+keyboard radio selection, empty API results, post-success refresh recovery,
+invalid-successful API responses, background refetch retention, and money/date
+formatting.
+
+```bash
+npm run check
+npm run build
+test -s dist/mockServiceWorker.js
+```
 
 ## AI use
-Which tools, and what for. Name two or three places where you changed,
-rejected or fixed what the AI produced, and why.
+
+Codex was used to analyze the brief and starter assets, draft implementation
+and test changes, review requirement coverage, and maintain the plan/progress
+documentation. All generated work was checked against the supplied brief, API
+contract and executable quality gates.
+
+Examples where generated work was corrected rather than accepted as-is:
+
+- The first transfer draft set the duplicate-submit lock after asynchronous
+  validation. Review identified the same-tick race; the lock was moved before
+  the first `await` and a delayed double-activation regression test was added.
+- Testing Library cleanup was initially assumed to be automatic. Vitest globals
+  are disabled here, so two rendered apps leaked between tests; shared teardown
+  now calls `cleanup()` explicitly.
+- Early preference code assumed `window.matchMedia` existed. It is absent in
+  JSDOM and can be unavailable in restricted contexts, so both pre-paint and
+  runtime paths are guarded.
+- A broad React Hook Form `watch()` subscription triggered the React compiler
+  lint rule and subscribed to more than necessary. It was replaced with
+  `useWatch({ control })`, with the complete default-value invariant documented.
 
 ## Not done / known issues
-What you left out or would do with more time.
-```
+
+- A public deployment URL is not configured yet. The build and browser MSW
+  artifact are ready, but this feature branch has intentionally not been merged
+  to `main` or attached to a hosting project.
+- The automated interactive desktop/mobile browser pass could not run in the
+  development host because Chrome was denied macOS Mach-port access. HTTP smoke
+  checks confirmed the built HTML and worker load; desktop, 390 px/mobile,
+  keyboard, focus, console and overflow checks still need one pass in a normal
+  browser or at the deployed URL.
+- Optional progress bar, discard confirmation, debug menu, balance hiding,
+  deep link and end-to-end test were deliberately omitted.
+- Mock data is in memory and resets on page reload by design. A real banking
+  product would additionally require authentication/authorization, integer
+  minor-unit money, idempotency keys, audit trails, observability, security
+  review and controlled rollout.

@@ -100,13 +100,15 @@ export default function TransferDialog({
   const queryClient = useQueryClient()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const openerRef = useRef<HTMLElement | null>(null)
-  const recipientSearchRef = useRef<HTMLInputElement>(null)
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null)
+  const successHeadingRef = useRef<HTMLHeadingElement>(null)
   const submitLockRef = useRef(false)
   const syncRunRef = useRef(0)
 
   const [step, setStep] = useState<TransferStep>('recipient')
   const [payeeSearch, setPayeeSearch] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [serverFieldMessages, setServerFieldMessages] = useState<string[]>([])
   const [success, setSuccess] = useState<TransferResponse | null>(null)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
 
@@ -186,6 +188,9 @@ export default function TransferDialog({
     )
   }, [payeeSearch, payeesQuery.data?.payees])
 
+  const dialogDataError = customerQuery.isError || accountsQuery.isError
+  const dialogDataPending = customerQuery.isPending || accountsQuery.isPending
+
   const mutation = useMutation({
     mutationFn: createTransfer,
     retry: false,
@@ -213,14 +218,23 @@ export default function TransferDialog({
   }, [open])
 
   useEffect(() => {
-    if (!open || step !== 'recipient' || success) return
-    window.setTimeout(() => recipientSearchRef.current?.focus(), 0)
-  }, [open, step, success])
-
-  useEffect(() => {
     if (!open || values.fromAccountId || depositAccounts.length === 0) return
     setValue('fromAccountId', depositAccounts[0].id)
   }, [depositAccounts, open, setValue, values.fromAccountId])
+
+  useEffect(() => {
+    if (!open || dialogDataPending || dialogDataError) return
+
+    const timeout = window.setTimeout(() => {
+      if (success) {
+        successHeadingRef.current?.focus()
+      } else {
+        stepHeadingRef.current?.focus()
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timeout)
+  }, [dialogDataError, dialogDataPending, open, step, success])
 
   function resetWorkflow() {
     syncRunRef.current += 1
@@ -228,6 +242,7 @@ export default function TransferDialog({
     setStep('recipient')
     setPayeeSearch('')
     setSubmitError(null)
+    setServerFieldMessages([])
     setSuccess(null)
     setSyncStatus('idle')
     mutation.reset()
@@ -235,7 +250,7 @@ export default function TransferDialog({
   }
 
   function requestClose() {
-    if (mutation.isPending) return
+    if (mutation.isPending || (success && syncStatus !== 'ready')) return
 
     const dialog = dialogRef.current
     if (dialog?.open) closeNativeDialog(dialog)
@@ -251,6 +266,7 @@ export default function TransferDialog({
 
   async function continueFromRecipient() {
     setSubmitError(null)
+    setServerFieldMessages([])
     const fields: FieldPath<TransferFormValues>[] =
       recipientMode === 'saved'
         ? ['payeeId']
@@ -264,6 +280,7 @@ export default function TransferDialog({
 
   async function continueFromAmount() {
     setSubmitError(null)
+    setServerFieldMessages([])
     const fields: FieldPath<TransferFormValues>[] = [
       'fromAccountId',
       'amount',
@@ -300,13 +317,14 @@ export default function TransferDialog({
 
   async function handleConfirm() {
     if (submitLockRef.current || mutation.isPending) return
-    if (!(await trigger(undefined, { shouldFocus: true }))) return
-
     submitLockRef.current = true
-    setSubmitError(null)
-    clearErrors()
 
     try {
+      if (!(await trigger(undefined, { shouldFocus: true }))) return
+
+      setSubmitError(null)
+      setServerFieldMessages([])
+      clearErrors()
       const response = await mutation.mutateAsync(
         toCreateTransferRequest(values),
       )
@@ -315,12 +333,14 @@ export default function TransferDialog({
     } catch (error) {
       if (error instanceof ApiError) {
         applyServerFieldErrors(error, setError)
+        setServerFieldMessages(Object.values(error.fields ?? {}))
         setSubmitError(
           error.fields && Object.keys(error.fields).length > 0
             ? error.message
             : GENERAL_SEND_ERROR,
         )
       } else {
+        setServerFieldMessages([])
         setSubmitError(GENERAL_SEND_ERROR)
       }
     } finally {
@@ -358,10 +378,6 @@ export default function TransferDialog({
         ),
       }
 
-  const dialogDataError = customerQuery.isError || accountsQuery.isError
-  const dialogDataPending =
-    customerQuery.isPending || accountsQuery.isPending || !values.fromAccountId
-
   return (
     <dialog
       className="transfer-dialog"
@@ -374,7 +390,13 @@ export default function TransferDialog({
           <div className="success-mark" aria-hidden="true">
             ✓
           </div>
-          <h2 id="transfer-dialog-title">Transfer sent</h2>
+          <h2
+            id="transfer-dialog-title"
+            ref={successHeadingRef}
+            tabIndex={-1}
+          >
+            Transfer sent
+          </h2>
           <p className="success-amount amount">
             {formatMoney(success.transfer.amount)}
           </p>
@@ -472,7 +494,11 @@ export default function TransferDialog({
 
             {!dialogDataPending && !dialogDataError && step === 'recipient' && (
               <section aria-labelledby="recipient-step-title">
-                <h3 id="recipient-step-title" tabIndex={-1}>
+                <h3
+                  id="recipient-step-title"
+                  ref={stepHeadingRef}
+                  tabIndex={-1}
+                >
                   Who are you sending to?
                 </h3>
 
@@ -482,7 +508,6 @@ export default function TransferDialog({
                 <input
                   className="text-input"
                   id="payee-search"
-                  ref={recipientSearchRef}
                   type="search"
                   value={payeeSearch}
                   placeholder="Search payees"
@@ -514,7 +539,11 @@ export default function TransferDialog({
                         <label className="payee-option" key={payee.id}>
                           <input
                             type="radio"
+                            name="saved-payee"
                             value={payee.id}
+                            aria-describedby={
+                              errors.payeeId ? 'payee-error' : undefined
+                            }
                             checked={
                               recipientMode === 'saved' &&
                               values.payeeId === payee.id
@@ -551,13 +580,17 @@ export default function TransferDialog({
                   className="new-recipient-toggle"
                   type="button"
                   aria-expanded={recipientMode === 'new'}
+                  aria-controls="new-recipient-fields"
                   onClick={chooseNewRecipient}
                 >
                   <span aria-hidden="true">＋</span> Send to someone new
                 </button>
 
                 {recipientMode === 'new' && (
-                  <div className="new-recipient-fields">
+                  <div
+                    className="new-recipient-fields"
+                    id="new-recipient-fields"
+                  >
                     <label className="field-label" htmlFor="recipient-name">
                       Recipient name
                     </label>
@@ -585,7 +618,6 @@ export default function TransferDialog({
                       type="text"
                       inputMode="numeric"
                       autoComplete="off"
-                      maxLength={8}
                       aria-invalid={Boolean(
                         errors.recipient?.accountNumber,
                       )}
@@ -626,7 +658,11 @@ export default function TransferDialog({
 
             {!dialogDataPending && !dialogDataError && step === 'amount' && (
               <section aria-labelledby="amount-step-title">
-                <h3 id="amount-step-title" tabIndex={-1}>
+                <h3
+                  id="amount-step-title"
+                  ref={stepHeadingRef}
+                  tabIndex={-1}
+                >
                   How much?
                 </h3>
 
@@ -722,7 +758,6 @@ export default function TransferDialog({
                     <textarea
                       className="text-input"
                       id="transfer-note"
-                      maxLength={51}
                       rows={3}
                       aria-invalid={Boolean(errors.note)}
                       aria-describedby={
@@ -742,21 +777,20 @@ export default function TransferDialog({
 
             {!dialogDataPending && !dialogDataError && step === 'review' && (
               <section aria-labelledby="review-step-title">
-                <h3 id="review-step-title" tabIndex={-1}>
+                <h3
+                  id="review-step-title"
+                  ref={stepHeadingRef}
+                  tabIndex={-1}
+                >
                   Check the details
                 </h3>
 
                 {submitError && (
                   <div className="transfer-alert" role="alert">
                     <p>{submitError}</p>
-                    {Object.values(errors)
-                      .map((error) => error?.message)
-                      .filter((message): message is string =>
-                        Boolean(message),
-                      )
-                      .map((message) => (
-                        <p key={message}>{message}</p>
-                      ))}
+                    {serverFieldMessages.map((message, index) => (
+                      <p key={`${message}-${index}`}>{message}</p>
+                    ))}
                   </div>
                 )}
 

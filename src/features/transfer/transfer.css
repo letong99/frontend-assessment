@@ -39,7 +39,7 @@
   font-size: var(--text-xl);
 }
 
-.eyebrow {
+.transfer-header .eyebrow {
   margin-bottom: var(--space-1);
   color: var(--text-subtle);
   font-size: var(--text-xs);
@@ -351,7 +351,10 @@
 }
 
 .success-panel {
+  max-height: inherit;
   padding: var(--space-10) var(--space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   text-align: center;
 }
 
@@ -397,6 +400,14 @@
 
   .transfer-form {
     height: 100dvh;
+  }
+
+  .success-panel {
+    height: 100dvh;
+    max-height: none;
+    padding-bottom: calc(
+      var(--space-10) + env(safe-area-inset-bottom, 0px)
+    );
   }
 
   .transfer-body {

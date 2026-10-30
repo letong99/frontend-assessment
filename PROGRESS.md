@@ -5,7 +5,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 ## Current status
 
 - Branch: `feat/meridian-app`
-- Stage: Phase 4 — integrated dashboard and transfer workflow; review in progress
+- Stage: Phase 5 — assessment hardening and delivery readiness
 - Overall: in progress
 - Working goal: complete the smallest accessible, responsive prototype that satisfies the mandatory assessment flow and tests.
 
@@ -43,6 +43,18 @@ Last updated: 2026-10-30 (Asia/Singapore)
 - Added explicit Testing Library cleanup to the Vitest setup because test globals are disabled; this prevents rendered applications and native dialogs leaking between tests.
 - Completed the full quality gate and production artifact check after integration.
 
+### 2026-10-30 — assessment hardening completed
+
+- Audited the integrated implementation against every required D/T/TH/E item and reviewed the transfer, responsive CSS, accessibility, and tests independently.
+- Moved the duplicate-submit lock before the first asynchronous validation boundary, so rapid double activation cannot create two POST requests.
+- Removed an empty-account loading deadlock; an empty deposit-account result now reaches an explicit, non-actionable transfer state instead of waiting forever.
+- Established one native saved-payee radio group, linked its validation message, connected the new-recipient disclosure, and added deterministic focus movement to each step and the success heading.
+- Prevented Escape from bypassing the post-success dashboard synchronization gate, and made the success view scroll safely on short, zoomed, landscape, and mobile viewports.
+- Preserved the final desktop grid in the loading skeleton, changed narrow account cards to a true one-column layout, and improved the daily-limit landmark name.
+- Removed the fixed light browser theme colour and scoped feature eyebrow styles so dark mode and feature CSS do not leak across boundaries.
+- Expanded integration coverage for failed-send value retention and retry, duplicate activation, payee-load retry, new-recipient masking/request shape, and validation accessibility. The suite now has 17 passing tests.
+- Attempted interactive desktop/mobile browser verification. The local production server and worker loaded, but the host denied Chrome's required macOS Mach-port access; visual, console, focus, and overflow checks remain a named manual step.
+
 ## Decisions
 
 | ID | Decision | Reason | Status |
@@ -59,6 +71,9 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | D-010 | Treat HTTP 201 as transfer success, then model dashboard synchronization as a separate recoverable state. | A refresh failure must never imply a completed transfer failed or invite a duplicate payment. | Active |
 | D-011 | Disable return from success until the first dashboard synchronization attempt completes. | Prevents showing knowingly stale financial data while still providing a retry path if synchronization fails. | Active |
 | D-012 | Add explicit `cleanup()` in shared test teardown. | Vitest runs with globals disabled, so implicit Testing Library cleanup was not registered and DOM/dialog state leaked between tests. | Active |
+| D-013 | Acquire the duplicate-submit lock synchronously before validation. | Validation is asynchronous; locking afterward leaves a same-tick race that can send money twice. | Active |
+| D-014 | Use a true single-column account list below 640 px. | This follows D8 literally and avoids making horizontal scrolling part of the core mobile interaction. | Active |
+| D-015 | Keep server field messages in a dedicated review-alert list while also mapping known paths into React Hook Form. | Nested and unknown backend messages remain visible on Review, and known messages remain linked to their fields when the user goes Back. | Active |
 
 ## Problems and investigations
 
@@ -70,6 +85,9 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | P-004 | React compiler lint rejected a broad React Hook Form `watch()` subscription. | The transfer slice failed lint despite correct runtime behavior. | Replaced it with `useWatch({ control })` and documented why the complete default-value shape is safe. | Resolved |
 | P-005 | `Intl.NumberFormat` emits a non-breaking space in SGD labels, while Testing Library text matching normalizes whitespace. | Exact money assertions failed despite correct UI output. | Asserted raw text content or the actual accessible name returned by the formatter. | Resolved |
 | P-006 | Rendered apps accumulated across integration tests because Testing Library auto-cleanup depends on global `afterEach`, which is disabled here. | The second test interacted with the first app and native dialog. | Registered explicit cleanup in `src/test/setup.ts`; the two-test sequence and full suite now pass. | Resolved |
+| P-007 | The submission lock was set after awaiting form validation. | Two rapid activations could both reach `POST /api/transfers`. | Moved the lock before the first await and added a delayed-response double-activation regression test. | Resolved |
+| P-008 | The transfer's loading predicate treated a missing selected account as a pending query. | An empty accounts response could display `Preparing your transfer…` forever. | Loading now reflects query state only; the amount step owns the explicit no-deposit-account state. | Resolved |
+| P-009 | Chrome could not launch through the available browser bridge because the host denied macOS Mach-port access. | Automated interactive responsive/keyboard/console evidence could not be collected in this environment. | Verified the local server and worker via HTTP, kept the limitation explicit, and left the browser matrix for a normal local browser or deployed URL. Temporary profiles were moved to Trash. | Open |
 
 ## Verification evidence
 
@@ -81,19 +99,22 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | Baseline install/check/build | Passed | Clean install, quality checks, production build, and worker assertion all completed. |
 | `npm ci` | Passed | 319 packages installed; 0 vulnerabilities. Deprecation notices are transitive/tooling warnings and do not block the assessment. |
 | Baseline `npm run check` | Passed | ESLint, TypeScript, and 3 starter tests passed before implementation. |
-| Focused transfer integration | Passed | Both critical App tests pass in sequence, including no-POST validation and post-success synchronization. |
-| Integrated `npm run check` | Passed | ESLint, strict TypeScript, and all 13 tests across 5 files passed. |
-| Integrated `npm run build` | Passed | Vite production build transformed 420 modules and completed successfully. Rollup only reported non-blocking annotation warnings from Zod dependencies. |
+| Focused transfer integration | Passed | All 6 App scenarios pass, including required no-POST/success flows plus failure retry, double activation, payee retry, and new-recipient payload behavior. |
+| Hardened `npm run check` | Passed | ESLint, strict TypeScript, and all 17 tests across 5 files passed. |
+| Hardened `npm run build` | Passed | Vite production build transformed 420 modules and completed successfully. Rollup only reported non-blocking annotation warnings from Zod dependencies. |
 | Worker artifact | Passed | `dist/mockServiceWorker.js` exists and is non-empty (9,666 bytes). |
+| Local production HTTP smoke | Passed | Vite served the built page at `127.0.0.1:4173`; the HTML and 9,666-byte mock worker were reachable. |
+| Interactive browser matrix | Blocked | Chrome launch failed at the host sandbox boundary; this is not evidence of an application failure. |
 
 ## Next steps
 
-1. Review the integrated experience against every mandatory brief item and address high-severity findings.
-2. Add the minimum missing failure/validation tests needed for assessment confidence.
-3. Perform responsive and keyboard/manual verification, then record evidence and remaining risks.
-4. Update the assessment README/runbook, rerun the final gate, and push the next stable checkpoint.
+1. Replace the starter README with the assessment runbook, decisions, state coverage, test evidence, AI disclosure, and known limitations.
+2. Add the planned CI quality gate and document deployment prerequisites without merging to `main` prematurely.
+3. Run a normal-browser desktop/mobile/keyboard matrix when a usable browser or deployed URL is available.
+4. Complete deployment after the repository/hosting target and main-branch merge are confirmed.
 
 ## Deferred and future work
 
-- CI implementation, E2E tooling, progress bar, discard confirmation, and debug menu remain optional until all mandatory requirements pass.
+- E2E tooling, progress bar, discard confirmation, and debug menu remain optional; they are not needed for the assessment core.
+- Live deployment and its real-browser smoke test remain pending. A production build is ready, but this feature branch has intentionally not been merged to `main` or connected to a hosting project.
 - Production authentication, authorization, precise ledger money types, audit, monitoring, and resilient rollout are design concerns only; this repository uses a synthetic in-browser mock API.

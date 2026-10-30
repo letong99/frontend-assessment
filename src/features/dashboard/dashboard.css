@@ -111,7 +111,7 @@
   margin: var(--space-1) 0 0;
 }
 
-.eyebrow {
+.dashboard-shell .eyebrow {
   color: var(--text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
@@ -484,12 +484,29 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.skeleton-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.skeleton-main {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
 .skeleton--card {
   height: 168px;
 }
 
 .skeleton--list {
   height: 480px;
+}
+
+.skeleton--rail {
+  height: 236px;
 }
 
 @keyframes skeleton-pulse {
@@ -508,6 +525,10 @@
   }
 
   .dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .skeleton-layout {
     grid-template-columns: 1fr;
   }
 
@@ -563,19 +584,7 @@
 
   .account-list,
   .skeleton-grid {
-    grid-auto-columns: minmax(248px, 80vw);
-    grid-auto-flow: column;
-    grid-template-columns: none;
-    margin-left: calc(-1 * var(--gutter-mobile));
-    margin-right: calc(-1 * var(--gutter-mobile));
-    overflow-x: auto;
-    padding: 0 var(--gutter-mobile) var(--space-2);
-    scroll-snap-type: x proximity;
-  }
-
-  .account-card,
-  .skeleton--card {
-    scroll-snap-align: start;
+    grid-template-columns: 1fr;
   }
 
   .transactions-section {

@@ -82,12 +82,17 @@ function DashboardSkeleton() {
       <div className="skeleton-stack" aria-hidden="true">
         <div className="skeleton skeleton--title" />
         <div className="skeleton skeleton--hero" />
-        <div className="skeleton-grid">
-          <div className="skeleton skeleton--card" />
-          <div className="skeleton skeleton--card" />
-          <div className="skeleton skeleton--card" />
+        <div className="skeleton-layout">
+          <div className="skeleton-main">
+            <div className="skeleton-grid">
+              <div className="skeleton skeleton--card" />
+              <div className="skeleton skeleton--card" />
+              <div className="skeleton skeleton--card" />
+            </div>
+            <div className="skeleton skeleton--list" />
+          </div>
+          <div className="skeleton skeleton--rail" />
         </div>
-        <div className="skeleton skeleton--list" />
       </div>
     </main>
   )
@@ -318,9 +323,11 @@ function DashboardContent({
           </section>
         </div>
 
-        <aside className="daily-limit" aria-labelledby="daily-limit-title">
-          <p className="eyebrow">Daily limit</p>
-          <h2 id="daily-limit-title" className="amount">
+        <aside className="daily-limit" aria-labelledby="daily-limit-label">
+          <p className="eyebrow" id="daily-limit-label">
+            Daily limit
+          </p>
+          <h2 className="amount">
             {formatMoney(remainingLimit)}
           </h2>
           <p>remaining today</p>

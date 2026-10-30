@@ -127,4 +127,24 @@ describe('Dashboard', () => {
     ).toBeInTheDocument()
     expect(accountRequests).toBe(2)
   })
+
+  it('shows explicit empty states for accounts and recent transactions', async () => {
+    server.use(
+      http.get('*/api/accounts', () =>
+        HttpResponse.json({ accounts: [] }),
+      ),
+      http.get('*/api/transactions', () =>
+        HttpResponse.json({ transactions: [], total: 0 }),
+      ),
+    )
+
+    renderDashboard()
+
+    await screen.findByRole('heading', { name: 'Good evening, Ava' })
+    expect(screen.getByText('No accounts are available.')).toBeInTheDocument()
+    expect(screen.getByText('No recent transactions yet.')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /New transfer/ }),
+    ).toBeDisabled()
+  })
 })

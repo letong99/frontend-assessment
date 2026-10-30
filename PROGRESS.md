@@ -52,7 +52,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 - Prevented Escape from bypassing the post-success dashboard synchronization gate, and made the success view scroll safely on short, zoomed, landscape, and mobile viewports.
 - Preserved the final desktop grid in the loading skeleton, changed narrow account cards to a true one-column layout, and improved the daily-limit landmark name.
 - Removed the fixed light browser theme colour and scoped feature eyebrow styles so dark mode and feature CSS do not leak across boundaries.
-- Expanded integration coverage for failed-send value retention and retry, duplicate activation, payee-load retry, new-recipient masking/request shape, and validation accessibility. The suite now has 17 passing tests.
+- Expanded integration coverage for failed-send value retention and retry, duplicate activation, payee-load retry, new-recipient masking/request shape, and validation accessibility. A later evidence pass brings the suite to 23 passing tests.
 - Attempted interactive desktop/mobile browser verification. The local production server and worker loaded, but the host denied Chrome's required macOS Mach-port access; visual, console, focus, and overflow checks remain a named manual step.
 
 ### 2026-10-30 — delivery handoff prepared
@@ -61,6 +61,14 @@ Last updated: 2026-10-30 (Asia/Singapore)
 - Added a least-privilege GitHub Actions quality gate for pushes and pull requests. It uses Node 22, locked installation, `npm run check`, the production build, a non-empty worker assertion, concurrency cancellation, and a seven-day `dist` artifact.
 - Added executable focus assertions for the Recipient, Amount, and success headings to supplement the browser checklist.
 - Kept deployment separate from CI: no hosting provider, production environment, or `main` merge was assumed from the feature branch.
+
+### 2026-10-30 — behavioral evidence expanded
+
+- Added dialog tests for both close paths and opener-focus restoration, arrow-key saved-payee selection, and backend field-error visibility/linkage.
+- Added explicit account/transaction/payee empty-result coverage and confirmed new-recipient entry remains available with no saved payees.
+- Exercised a post-201 dashboard refresh failure: the success state remains authoritative, Escape cannot expose stale data, Retry synchronizes the dashboard, and return becomes available afterward.
+- Refined the dashboard error boundary so a background refetch failure retains previously loaded data; the full-page dashboard error is reserved for missing initial data.
+- Re-ran the complete gate: ESLint, strict TypeScript, all 23 tests in 5 files, production build, worker assertion, and diff whitespace check pass.
 
 ## Decisions
 
@@ -82,6 +90,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | D-014 | Use a true single-column account list below 640 px. | This follows D8 literally and avoids making horizontal scrolling part of the core mobile interaction. | Active |
 | D-015 | Keep server field messages in a dedicated review-alert list while also mapping known paths into React Hook Form. | Nested and unknown backend messages remain visible on Review, and known messages remain linked to their fields when the user goes Back. | Active |
 | D-016 | Keep CI provider-neutral and deployment as an explicit later stage. | Quality checks can run on every branch/PR, while publishing requires a selected hosting target and controlled main-branch merge. | Active |
+| D-017 | Reserve the full dashboard error screen for queries without usable data. | React Query retains prior data after a background refetch failure; keeping it avoids unnecessary layout replacement while the transfer dialog owns synchronization recovery. | Active |
 
 ## Problems and investigations
 
@@ -96,6 +105,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | P-007 | The submission lock was set after awaiting form validation. | Two rapid activations could both reach `POST /api/transfers`. | Moved the lock before the first await and added a delayed-response double-activation regression test. | Resolved |
 | P-008 | The transfer's loading predicate treated a missing selected account as a pending query. | An empty accounts response could display `Preparing your transfer…` forever. | Loading now reflects query state only; the amount step owns the explicit no-deposit-account state. | Resolved |
 | P-009 | Chrome could not launch through the available browser bridge because the host denied macOS Mach-port access. | Automated interactive responsive/keyboard/console evidence could not be collected in this environment. | Verified the local server and worker via HTTP, kept the limitation explicit, and left the browser matrix for a normal local browser or deployed URL. Temporary profiles were moved to Trash. | Open |
+| P-010 | An induced post-success refetch failure initially replaced the populated dashboard with its initial-load error underneath the success dialog. | It created a second alert and discarded useful stale data during a recoverable background failure. | The dashboard now renders its full error only when a failed query has no data; the transfer warning and retry remain responsible for synchronization recovery. | Resolved |
 
 ## Verification evidence
 
@@ -107,8 +117,8 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | Baseline install/check/build | Passed | Clean install, quality checks, production build, and worker assertion all completed. |
 | `npm ci` | Passed | 319 packages installed; 0 vulnerabilities. Deprecation notices are transitive/tooling warnings and do not block the assessment. |
 | Baseline `npm run check` | Passed | ESLint, TypeScript, and 3 starter tests passed before implementation. |
-| Focused transfer integration | Passed | All 6 App scenarios pass, including required no-POST/success flows plus failure retry, double activation, payee retry, and new-recipient payload behavior. |
-| Hardened `npm run check` | Passed | ESLint, strict TypeScript, and all 17 tests across 5 files passed. |
+| Focused transfer integration | Passed | All 11 App scenarios pass, including required flows, focus/keyboard semantics, backend mapping, duplicate protection, empty payees, and refresh recovery. |
+| Hardened `npm run check` | Passed | ESLint, strict TypeScript, and all 23 tests across 5 files passed. |
 | Hardened `npm run build` | Passed | Vite production build transformed 420 modules and completed successfully. Rollup only reported non-blocking annotation warnings from Zod dependencies. |
 | Worker artifact | Passed | `dist/mockServiceWorker.js` exists and is non-empty (9,666 bytes). |
 | Local production HTTP smoke | Passed | Vite served the built page at `127.0.0.1:4173`; the HTML and 9,666-byte mock worker were reachable. |

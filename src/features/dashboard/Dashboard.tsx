@@ -359,7 +359,9 @@ export default function Dashboard({ onNewTransfer }: DashboardProps) {
 
   const queries = [customerQuery, accountsQuery, transactionsQuery]
   const isPending = queries.some((query) => query.isPending)
-  const isError = queries.some((query) => query.isError)
+  const isInitialError = queries.some(
+    (query) => query.isError && query.data === undefined,
+  )
   const isRetrying = queries.some((query) => query.isFetching)
 
   const retryDashboard = () => {
@@ -379,14 +381,14 @@ export default function Dashboard({ onNewTransfer }: DashboardProps) {
         onSegmentChange={preferences.setSegment}
       />
       {isPending ? <DashboardSkeleton /> : null}
-      {!isPending && isError ? (
+      {!isPending && isInitialError ? (
         <DashboardError
           isRetrying={isRetrying}
           onRetry={retryDashboard}
         />
       ) : null}
       {!isPending &&
-      !isError &&
+      !isInitialError &&
       customerQuery.data &&
       accountsQuery.data &&
       transactionsQuery.data ? (

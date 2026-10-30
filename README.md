@@ -41,7 +41,7 @@ The production artifact must include `dist/mockServiceWorker.js`; see
 | Transfer (T1–T8) | Native modal dialog, saved-payee search or new-recipient entry, amount/account/note step, review and editing, guarded POST, truthful success/failure states, dashboard refresh, linked errors, announcements, radio-keyboard semantics, and step/focus restoration. |
 | Validation | One contextual Zod schema covers recipient, account, amount, balance, daily-limit and note rules for blur and Continue/submit validation. |
 | Themes (TH1–TH3) | System-aware pre-paint theme, persistent light/dark and Retail/Premium controls, root data attributes, semantic supplied tokens, and visible focus states. |
-| Engineering (E1–E5) | Strict typed API boundary, TanStack Query server state, React Hook Form + Zod, 17 behavioural tests, passing checks, and a verified production build. |
+| Engineering (E1–E5) | Strict typed API boundary, TanStack Query server state, React Hook Form + Zod, 23 behavioural tests, passing checks, and a verified production build. |
 | Deployment (E6) | The static artifact and production MSW worker are build-ready; a public URL is still pending. |
 
 ## Project structure
@@ -114,13 +114,12 @@ Planning and implementation evidence is kept in
 The normal mock delay makes loading visible on reload. Search for an impossible
 term to see the search-empty state. Deliberate failures are exercised with
 per-test MSW overrides rather than a permanent "break the app" control. The
-true API-empty branches are implemented but are not automated yet; use the
-`scenario=empty` hook from `brief/api-contract.md` in a temporary test override
-when inspecting them.
+accounts, transaction, and saved-payee empty branches are covered with scoped
+MSW response overrides; no permanent debug control ships in the main UI.
 
 ## Tests
 
-Latest verified result: **17 tests in 5 files pass**, together with ESLint,
+Latest verified result: **23 tests in 5 files pass**, together with ESLint,
 strict TypeScript and the production build.
 
 The suite includes the three mandatory E4 behaviours:
@@ -134,7 +133,9 @@ The suite includes the three mandatory E4 behaviours:
 Additional high-risk coverage includes failed-send retention and retry, rapid
 double activation producing one POST, saved-payee recovery, new-recipient
 masking/request shape, transaction search/no-match behaviour, preferences,
-validation rules, and money/date formatting.
+validation rules, backend field mapping, dialog close/focus restoration,
+keyboard radio selection, empty API results, post-success refresh recovery,
+and money/date formatting.
 
 ```bash
 npm run check

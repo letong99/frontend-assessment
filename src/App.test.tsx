@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { delay, http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -45,6 +51,48 @@ beforeEach(() => {
 })
 
 describe('Meridian transfer flow', () => {
+  it('closes with the close control or Escape and restores opener focus', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await screen.findByRole('heading', { name: 'Good evening, Ava' })
+    const opener = screen.getByRole('button', { name: /New transfer/ })
+
+    await user.click(opener)
+    const recipientHeading = await screen.findByRole('heading', {
+      name: 'Who are you sending to?',
+    })
+    await waitFor(() => expect(recipientHeading).toHaveFocus())
+    const dialog = document.querySelector('dialog')
+    expect(dialog).not.toBeNull()
+    expect(dialog).toHaveAttribute('open')
+
+    await user.click(screen.getByRole('button', { name: 'Close new transfer' }))
+    await waitFor(() => expect(dialog).not.toHaveAttribute('open'))
+    await waitFor(() => expect(opener).toHaveFocus())
+
+    await user.click(opener)
+    await screen.findByRole('heading', { name: 'Who are you sending to?' })
+    fireEvent(dialog!, new Event('cancel', { cancelable: true }))
+    await waitFor(() => expect(dialog).not.toHaveAttribute('open'))
+    await waitFor(() => expect(opener).toHaveFocus())
+  })
+
+  it('supports arrow-key selection within the saved-payee radio group', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await screen.findByRole('heading', { name: 'Good evening, Ava' })
+    await user.click(screen.getByRole('button', { name: /New transfer/ }))
+
+    const jamie = await screen.findByRole('radio', { name: /Jamie Tan/ })
+    const marcus = screen.getByRole('radio', { name: /Marcus Lee/ })
+    jamie.focus()
+    await user.keyboard('{ArrowDown}')
+
+    expect(marcus).toHaveFocus()
+    expect(marcus).toBeChecked()
+    expect(jamie).not.toBeChecked()
+  })
+
   it('shows an over-balance error and sends no request', async () => {
     let transferRequests = 0
     server.use(
@@ -124,6 +172,46 @@ describe('Meridian transfer flow', () => {
     await waitFor(() => expect(successHeading).toHaveFocus())
   })
 
+  it('maps backend field errors into the review alert and source field', async () => {
+    server.use(
+      http.post('*/api/transfers', () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: 'INSUFFICIENT_FUNDS',
+              message: 'Amount exceeds available balance.',
+              fields: { amount: 'The available balance changed. Enter less.' },
+            },
+          },
+          { status: 422 },
+        ),
+      ),
+    )
+
+    const user = userEvent.setup()
+    renderApp()
+    await reachAmountStep(user)
+    await user.type(screen.getByLabelText('Amount'), '120')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByRole('heading', { name: 'Check the details' })
+    await user.click(screen.getByRole('button', { name: 'Confirm transfer' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Amount exceeds available balance.')
+    expect(alert).toHaveTextContent('The available balance changed. Enter less.')
+    expect(
+      screen.queryByRole('heading', { name: 'Transfer sent' }),
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    const amount = screen.getByLabelText('Amount')
+    expect(amount).toHaveValue('120')
+    expect(amount).toHaveAttribute('aria-describedby', 'amount-error')
+    expect(
+      screen.getByText('The available balance changed. Enter less.'),
+    ).toBeInTheDocument()
+  })
+
   it('recovers when saved payees fail to load', async () => {
     let payeeRequests = 0
     server.use(
@@ -165,6 +253,25 @@ describe('Meridian transfer flow', () => {
       await screen.findByRole('radio', { name: /Jamie Tan/ }),
     ).toBeInTheDocument()
     expect(payeeRequests).toBe(2)
+  })
+
+  it('keeps new-recipient entry available when there are no saved payees', async () => {
+    server.use(
+      http.get('*/api/payees', () => HttpResponse.json({ payees: [] })),
+    )
+
+    const user = userEvent.setup()
+    renderApp()
+    await screen.findByRole('heading', { name: 'Good evening, Ava' })
+    await user.click(screen.getByRole('button', { name: /New transfer/ }))
+
+    expect(await screen.findByText('No saved payees yet.')).toBeInTheDocument()
+    await user.click(
+      screen.getByRole('button', { name: 'Send to someone new' }),
+    )
+    expect(screen.getByLabelText('Recipient name')).toBeInTheDocument()
+    expect(screen.getByLabelText('Account number')).toBeInTheDocument()
+    expect(screen.getByLabelText('Bank')).toBeInTheDocument()
   })
 
   it('sends a new recipient without a saved payee id', async () => {
@@ -263,6 +370,90 @@ describe('Meridian transfer flow', () => {
     ).toBeDisabled()
     await screen.findByRole('alert')
     expect(transferRequests).toBe(1)
+  })
+
+  it('keeps confirmed success visible until a failed dashboard refresh recovers', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await reachAmountStep(user)
+    await user.type(screen.getByLabelText('Amount'), '120')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByRole('heading', { name: 'Check the details' })
+
+    let accountRefreshes = 0
+    server.use(
+      http.get('*/api/accounts', () => {
+        accountRefreshes += 1
+        if (accountRefreshes === 1) {
+          return HttpResponse.json(
+            { error: { code: 'INTERNAL_ERROR', message: 'Refresh failed' } },
+            { status: 500 },
+          )
+        }
+
+        return HttpResponse.json({
+          accounts: [
+            {
+              id: 'acc_checking',
+              name: 'Everyday Checking',
+              type: 'checking',
+              maskedNumber: '•••• 4821',
+              balance: 4160.55,
+              currency: 'SGD',
+            },
+            {
+              id: 'acc_savings',
+              name: 'Savings Plus',
+              type: 'savings',
+              maskedNumber: '•••• 9930',
+              balance: 12840,
+              currency: 'SGD',
+            },
+            {
+              id: 'acc_credit',
+              name: 'Rewards Card',
+              type: 'credit',
+              maskedNumber: '•••• 7712',
+              balance: -420.3,
+              currency: 'SGD',
+            },
+          ],
+        })
+      }),
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Confirm transfer' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Transfer sent' }),
+    ).toBeInTheDocument()
+    const dialog = document.querySelector('dialog')
+    expect(await within(dialog!).findByRole('alert')).toHaveTextContent(
+      "Your transfer was sent, but we couldn't refresh the dashboard.",
+    )
+    expect(
+      screen.queryByText("We couldn't load your dashboard."),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('Total available')).toBeInTheDocument()
+
+    const backToDashboard = screen.getByRole('button', {
+      name: 'Back to dashboard',
+    })
+    expect(backToDashboard).toBeDisabled()
+    fireEvent(dialog!, new Event('cancel', { cancelable: true }))
+    expect(dialog).toHaveAttribute('open')
+
+    await user.click(
+      screen.getByRole('button', { name: 'Retry dashboard refresh' }),
+    )
+    await waitFor(() => expect(backToDashboard).toBeEnabled())
+    await user.click(backToDashboard)
+
+    expect(accountRefreshes).toBe(2)
+    expect(screen.getByText('Transfer to Jamie Tan')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Everyday Checking' }).parentElement
+        ?.parentElement?.textContent,
+    ).toContain(formatMoney(4160.55))
   })
 
   it('shows success and refreshes dashboard data after a transfer', async () => {

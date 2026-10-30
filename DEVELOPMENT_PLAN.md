@@ -86,7 +86,7 @@ Status starts as `planned` and should move to `verified` only with the stated ev
 | E1–E3 | Strict types, TanStack Query, RHF + Zod | Type/lint checks and code review | Continuous | Planned |
 | E4 | Three mandated behavior tests | Green Vitest results | 2–4 | Planned |
 | E5 | Clean quality/build and console | `npm run check`, `npm run build`, manual console check | 5 | Planned |
-| E6 | Public deployment without local server | Hosted MSW and transfer smoke test | 6 | Planned |
+| E6 | Public deployment without local server | Hosted MSW and transfer smoke test | 6 | HTTP artifact verified; browser smoke pending |
 
 ## 4. Product behavior contract
 
@@ -500,6 +500,12 @@ Exit: all P0 local gates and definition of done pass.
 - Implement minimal CI only if P0 is stable and time remains.
 - Tag the verified submission commit after hosted verification.
 
+Outcome update (2026-10-30): the reviewed static artifact is live at
+[frontend-assessment.wei538664.workers.dev](https://frontend-assessment.wei538664.workers.dev/).
+Hosted HTML and the root mock worker exactly match the locally verified build
+for application commit `d143f03`. Interactive service-worker and transfer smoke
+remain open and are not inferred from HTTP artifact checks.
+
 Exit: public URL, repository, README, smoke evidence, and rollback path are ready to submit.
 
 ## 9. Source control, CI/CD, and deployment
@@ -526,9 +532,16 @@ Do not require coverage because no coverage provider/script is installed. Previe
 
 ### Assessment deployment
 
-Default recommendation: Vercel Git integration with Vite preset, Node 22, install command `npm ci`, build command `npm run build`, and output `dist`. Netlify or Cloudflare Pages are equivalent supported choices. No SPA redirect is needed because there is no routing.
+Selected assessment host: Cloudflare static hosting with Node 22, locked dependency installation, `npm run build`, and `dist` output. No SPA redirect is needed because there is no client-side routing. CI remains provider-neutral.
 
 Provider-managed assessment deployment may rebuild the reviewed commit. Record the deployed SHA and ensure the lockfile/Node/build settings match local/CI verification. Exact build-once artifact promotion belongs to the production design below.
+
+Recorded artifact evidence: the Cloudflare root and
+`/mockServiceWorker.js` return HTTPS 200 with revalidation headers. Their bytes
+match the local production output for application commit `d143f03`; the worker
+is 9,666 bytes with SHA-256
+`26171599d94d5445297303f3a1f1cedec26835ea3d0057dcfa92ec520cb35cca`.
+This does not replace the browser-only interception and transfer checks below.
 
 ### Hosted smoke checklist
 

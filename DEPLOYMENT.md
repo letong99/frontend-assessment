@@ -4,6 +4,18 @@ The deployed app must work **without a local server**. The starter runs the mock
 API (MSW) in the browser, so your site is just static files. You only need this
 page when you deploy, or if the mock API stops responding.
 
+## Current deployment
+
+- URL: [frontend-assessment.wei538664.workers.dev](https://frontend-assessment.wei538664.workers.dev/)
+- Host: Cloudflare static hosting over HTTPS
+- Application artifact baseline: commit `d143f03`
+- Verified: root HTML and `/mockServiceWorker.js` return HTTP 200 and exactly
+  match the locally built `dist` files.
+- Worker evidence: JavaScript, 9,666 bytes, SHA-256
+  `26171599d94d5445297303f3a1f1cedec26835ea3d0057dcfa92ec520cb35cca`.
+- Pending: normal-browser worker control/API interception, transfer,
+  desktop/mobile, keyboard/focus, console and idle-refetch smoke.
+
 ## 1. Build
 
 ```bash
@@ -42,12 +54,12 @@ The three platforms above are simpler.
 
 ## 4. Deployment checklist
 
-- [ ] `dist/mockServiceWorker.js` exists after `npm run build`.
-- [ ] The worker starts in the production build (it is not gated behind
+- [x] `dist/mockServiceWorker.js` exists after `npm run build`.
+- [x] The worker starts in the production build (it is not gated behind
       `import.meta.env.DEV`).
-- [ ] `worker.start()` is awaited before the first API request.
-- [ ] The site is served over HTTPS (Netlify/Vercel/Cloudflare provide it).
-- [ ] API paths respect `import.meta.env.BASE_URL` if deployed to a sub-path.
+- [x] `worker.start()` is awaited before the first API request.
+- [x] The site is served over HTTPS (Netlify/Vercel/Cloudflare provide it).
+- [x] API paths respect `import.meta.env.BASE_URL` if deployed to a sub-path.
 - [ ] DevTools → **Application → Service Workers** shows the worker as
       activated and running.
 - [ ] In DevTools → **Network**, `/api/health` shows

@@ -1,6 +1,6 @@
 # Meridian Banking — Frontend Assessment
 
-- Deployed: pending hosting setup and merge to `main`
+- Deployed: [Cloudflare](https://frontend-assessment.wei538664.workers.dev/)
 - Active implementation branch: `feat/meridian-app`
 - Run locally: `npm ci && npm run dev`
 
@@ -34,6 +34,16 @@ npm run test:watch  # Vitest watch mode
 The production artifact must include `dist/mockServiceWorker.js`; see
 [DEPLOYMENT.md](DEPLOYMENT.md) for hosting settings and the release checklist.
 
+## Live deployment
+
+The static production build is available at
+[frontend-assessment.wei538664.workers.dev](https://frontend-assessment.wei538664.workers.dev/).
+An HTTP smoke check confirmed the Meridian HTML and the root
+`mockServiceWorker.js` are served over HTTPS. Both files match the locally
+verified production artifact byte for byte; the worker is JavaScript and 9,666
+bytes. Browser-only service-worker interception and the final
+desktop/mobile/keyboard transfer smoke remain listed under known issues.
+
 ## Requirement coverage
 
 | Area | Implemented behaviour |
@@ -43,7 +53,7 @@ The production artifact must include `dist/mockServiceWorker.js`; see
 | Validation | One contextual Zod schema covers recipient, account, amount, balance, daily-limit and note rules for blur and Continue/submit validation. |
 | Themes (TH1–TH3) | System-aware pre-paint theme, persistent light/dark and Retail/Premium controls, root data attributes, semantic supplied tokens, and visible focus states. |
 | Engineering (E1–E5) | Strict typed API boundary, TanStack Query server state, React Hook Form + Zod, 32 behavioural tests, passing checks, and a verified production build. |
-| Deployment (E6) | The static artifact and production MSW worker are build-ready; a public URL is still pending. |
+| Deployment (E6) | The static build is live on Cloudflare over HTTPS; the HTML and 9,666-byte production MSW worker match the verified local artifact. Interactive browser smoke remains pending. |
 
 ## Project structure
 
@@ -127,7 +137,7 @@ MSW response overrides; no permanent debug control ships in the main UI.
 
 ## Tests
 
-Latest verified result: **30 tests in 6 files pass**, together with ESLint,
+Latest verified result: **32 tests in 6 files pass**, together with ESLint,
 strict TypeScript and the production build.
 
 The suite includes the three mandatory E4 behaviours:
@@ -143,8 +153,8 @@ double activation producing one POST, saved-payee recovery, new-recipient
 masking/request shape, transaction search/no-match behaviour, preferences,
 validation rules, backend field mapping, dialog close/focus restoration,
 keyboard radio selection, empty API results, post-success refresh recovery,
-invalid-successful API responses, background refetch retention, and money/date
-formatting.
+invalid-successful API responses, background refetch retention, full-history
+pagination/cache refresh, and money/date formatting.
 
 ```bash
 npm run check
@@ -176,14 +186,13 @@ Examples where generated work was corrected rather than accepted as-is:
 
 ## Not done / known issues
 
-- A public deployment URL is not configured yet. The build and browser MSW
-  artifact are ready, but this feature branch has intentionally not been merged
-  to `main` or attached to a hosting project.
+- The Cloudflare deployment is live, but `feat/meridian-app` has not yet been
+  reviewed and merged into `main`.
 - The automated interactive desktop/mobile browser pass could not run in the
-  development host because Chrome was denied macOS Mach-port access. HTTP smoke
-  checks confirmed the built HTML and worker load; desktop, 390 px/mobile,
-  keyboard, focus, console and overflow checks still need one pass in a normal
-  browser or at the deployed URL.
+  development host because Chrome was denied macOS Mach-port access. Hosted
+  HTTP checks confirmed the exact built HTML and worker artifact; desktop,
+  390 px/mobile, keyboard, focus, service-worker interception, transfer,
+  console and overflow checks still need one pass in a normal browser.
 - Optional progress bar, discard confirmation, debug menu, balance hiding,
   deep link and end-to-end test were deliberately omitted.
 - Mock data is in memory and resets on page reload by design. A real banking

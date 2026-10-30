@@ -5,9 +5,9 @@ Last updated: 2026-10-30 (Asia/Singapore)
 ## Current status
 
 - Branch: `feat/meridian-app`
-- Stage: Phase 5 — assessment hardening and delivery readiness
-- Overall: in progress
-- Working goal: complete the smallest accessible, responsive prototype that satisfies the mandatory assessment flow and tests.
+- Stage: Phase 6 — deployed handoff and hosted verification
+- Overall: delivery-ready; normal-browser smoke and `main` integration remain
+- Working goal: complete hosted interaction evidence and the controlled final branch handoff.
 
 ## Completed work
 
@@ -98,6 +98,15 @@ Last updated: 2026-10-30 (Asia/Singapore)
 - Changed post-transfer synchronization to refetch every active transaction query variant so both recent and expanded views remain authoritative.
 - Added behavioral coverage for lazy loading, page boundaries, older-record discovery/search, page reset, cache isolation, and degraded history loading.
 
+### 2026-10-30 — Cloudflare deployment published and HTTP-verified
+
+- Published the static assessment build at [frontend-assessment.wei538664.workers.dev](https://frontend-assessment.wei538664.workers.dev/).
+- Confirmed the root URL returns HTTPS 200, `text/html`, and the expected `Meridian Banking` document.
+- Confirmed `/mockServiceWorker.js` returns HTTPS 200 as JavaScript with the expected 9,666-byte body.
+- Compared the hosted HTML and worker against the locally verified `dist` output for application commit `d143f03`; both are byte-for-byte identical. The worker SHA-256 is `26171599d94d5445297303f3a1f1cedec26835ea3d0057dcfa92ec520cb35cca`.
+- Confirmed the hosted HTML references the expected hashed JS/CSS bundles and Cloudflare serves the HTML and worker with revalidation headers.
+- Kept browser-only claims separate: service-worker control, intercepted API JSON, transfer behavior, responsive layout, keyboard/focus, console and idle-refetch smoke still require a normal browser.
+
 ## Decisions
 
 | ID | Decision | Reason | Status |
@@ -117,13 +126,14 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | D-013 | Acquire the duplicate-submit lock synchronously before validation. | Validation is asynchronous; locking afterward leaves a same-tick race that can send money twice. | Active |
 | D-014 | Use a true single-column account list below 640 px. | This follows D8 literally and avoids making horizontal scrolling part of the core mobile interaction. | Active |
 | D-015 | Keep server field messages in a dedicated review-alert list while also mapping known paths into React Hook Form. | Nested and unknown backend messages remain visible on Review, and known messages remain linked to their fields when the user goes Back. | Active |
-| D-016 | Keep CI provider-neutral and deployment as an explicit later stage. | Quality checks can run on every branch/PR, while publishing requires a selected hosting target and controlled main-branch merge. | Active |
+| D-016 | Keep CI provider-neutral and deployment as an explicit later stage. | Quality checks remained portable while the hosting target was undecided; deployment was added only after the application gate passed. | Fulfilled |
 | D-017 | Reserve the full dashboard error screen for queries without usable data. | React Query retains prior data after a background refetch failure; keeping it avoids unnecessary layout replacement while the transfer dialog owns synchronization recovery. | Active |
 | D-018 | Derive customer identity shown in the dashboard from the customer API response. | The seed currently contains Ava, but personalization must follow server data rather than a component literal. | Active |
 | D-019 | Enforce the supplied API's top-level JSON-object contract at the shared fetch boundary. | Vite's SPA fallback is HTTP 200 HTML; accepting a parse failure as successful `null` data corrupts query state silently. | Active |
 | D-020 | Make dashboard rendering exhaustive based on pending state and complete required data. | No settled query-state combination should render only the header; prior data remains useful during a background failure. | Active |
 | D-021 | Keep the supplied assessment endpoints unchanged and document production transaction safety/authentication as a backend-collaboration contract. | Frontend locking is a UX safeguard; atomicity, authoritative validation, authorization, idempotency and reconciliation require an agreed backend boundary. | Active |
 | D-022 | Preserve the required eight-row initial query, then lazy-load up to 50 records and paginate locally in groups of eight. | It exposes the complete 15-record supplied history, avoids a nested-scroll accessibility trap, keeps initial loading bounded, and requires no endpoint changes. | Active |
+| D-023 | Publish the reviewed static artifact on Cloudflare without adding a runtime backend or changing the supplied API contract. | Cloudflare serves the Vite output and root MSW worker over HTTPS while CI remains provider-neutral. | Active |
 
 ## Problems and investigations
 
@@ -137,7 +147,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | P-006 | Rendered apps accumulated across integration tests because Testing Library auto-cleanup depends on global `afterEach`, which is disabled here. | The second test interacted with the first app and native dialog. | Registered explicit cleanup in `src/test/setup.ts`; the two-test sequence and full suite now pass. | Resolved |
 | P-007 | The submission lock was set after awaiting form validation. | Two rapid activations could both reach `POST /api/transfers`. | Moved the lock before the first await and added a delayed-response double-activation regression test. | Resolved |
 | P-008 | The transfer's loading predicate treated a missing selected account as a pending query. | An empty accounts response could display `Preparing your transfer…` forever. | Loading now reflects query state only; the amount step owns the explicit no-deposit-account state. | Resolved |
-| P-009 | Chrome could not launch through the available browser bridge because the host denied macOS Mach-port access. | Automated interactive responsive/keyboard/console evidence could not be collected in this environment. | Verified the local server and worker via HTTP, kept the limitation explicit, and left the browser matrix for a normal local browser or deployed URL. Temporary profiles were moved to Trash. | Open |
+| P-009 | Chrome could not launch through the available browser bridge because the host denied macOS Mach-port access. | Automated interactive responsive/keyboard/console evidence could not be collected in this environment. | Verified local and hosted artifacts over HTTP, kept the limitation explicit, and left the interaction matrix for a normal browser at the Cloudflare URL. Temporary profiles were moved to Trash. | Open |
 | P-010 | An induced post-success refetch failure initially replaced the populated dashboard with its initial-load error underneath the success dialog. | It created a second alert and discarded useful stale data during a recoverable background failure. | The dashboard now renders its full error only when a failed query has no data; the transfer warning and retry remain responsible for synchronization recovery. | Resolved |
 | P-011 | The dashboard greeting embedded `Ava` directly in JSX. | A different signed-in customer response would still display the seed customer's name. | Passed the typed `Customer` object into the dashboard content and rendered `customer.firstName`; added a non-Ava API regression test. | Resolved |
 | P-012 | After an idle tab refetched, an un-intercepted `/api/*` request could receive Vite's 200 HTML fallback; JSON parsing was swallowed and `null` cached as successful data. | The dashboard matched neither loading, error, nor content and displayed only its header. | Reject invalid successful responses at `apiFetch`, preserve last good query data on refetch failure, and route missing settled data to Retry. | Resolved |
@@ -163,16 +173,18 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | Hardened `npm run build` | Passed | Vite production build transformed 420 modules and completed successfully. Rollup only reported non-blocking annotation warnings from Zod dependencies. |
 | Worker artifact | Passed | `dist/mockServiceWorker.js` exists and is non-empty (9,666 bytes). |
 | Local production HTTP smoke | Passed | Vite served the built page at `127.0.0.1:4173`; the HTML and 9,666-byte mock worker were reachable. |
+| Cloudflare root HTTP smoke | Passed | The public HTTPS URL returns 200, `text/html`, the Meridian title and the exact locally verified `dist/index.html`. |
+| Hosted worker artifact | Passed | `/mockServiceWorker.js` returns 200 as JavaScript; its 9,666-byte body and SHA-256 exactly match the local production artifact. |
 | Interactive browser matrix | Blocked | Chrome launch failed at the host sandbox boundary; this is not evidence of an application failure. |
 
 ## Next steps
 
-1. Confirm the pushed GitHub Actions run and review the feature branch before merge.
-2. Run a normal-browser desktop/mobile/keyboard matrix when a usable browser or deployed URL is available.
-3. Complete deployment after the repository/hosting target and main-branch merge are confirmed.
+1. Run the normal-browser service-worker, transfer, desktop/mobile, keyboard/focus, console and idle-refetch matrix against the Cloudflare URL.
+2. Confirm the GitHub Actions result, review `feat/meridian-app`, and merge it into `main` through the agreed branch policy.
+3. Record the Cloudflare deployment source configuration and rollback rehearsal; optionally tag the verified submission and attach a custom domain.
 
 ## Deferred and future work
 
 - E2E tooling, progress bar, discard confirmation, and debug menu remain optional; they are not needed for the assessment core.
-- Live deployment and its real-browser smoke test remain pending. A production build is ready, but this feature branch has intentionally not been merged to `main` or connected to a hosting project.
+- The live deployment exists and its static artifact is verified. Interactive hosted smoke and the controlled `main` merge remain pending.
 - Production authentication, authorization, precise ledger money types, audit, monitoring, and resilient rollout are design concerns only; this repository uses a synthetic in-browser mock API.

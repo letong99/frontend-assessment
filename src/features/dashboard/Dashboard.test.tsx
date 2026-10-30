@@ -57,6 +57,33 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('Dashboard', () => {
+  it('renders the customer name returned by the API', async () => {
+    server.use(
+      http.get('*/api/customer', () =>
+        HttpResponse.json({
+          customer: {
+            id: 'cus_dynamic',
+            firstName: 'Mei',
+            lastName: 'Lin',
+            email: 'mei.lin@example.com',
+            segment: 'retail',
+            dailyTransferLimit: 5000,
+            transferredToday: 0,
+          },
+        }),
+      ),
+    )
+
+    renderDashboard()
+
+    expect(
+      await screen.findByRole('heading', { name: 'Good evening, Mei' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Good evening, Ava' }),
+    ).not.toBeInTheDocument()
+  })
+
   it('loads account data and filters transactions by category', async () => {
     const user = userEvent.setup()
     renderDashboard()

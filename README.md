@@ -41,7 +41,7 @@ The production artifact must include `dist/mockServiceWorker.js`; see
 | Transfer (T1–T8) | Native modal dialog, saved-payee search or new-recipient entry, amount/account/note step, review and editing, guarded POST, truthful success/failure states, dashboard refresh, linked errors, announcements, radio-keyboard semantics, and step/focus restoration. |
 | Validation | One contextual Zod schema covers recipient, account, amount, balance, daily-limit and note rules for blur and Continue/submit validation. |
 | Themes (TH1–TH3) | System-aware pre-paint theme, persistent light/dark and Retail/Premium controls, root data attributes, semantic supplied tokens, and visible focus states. |
-| Engineering (E1–E5) | Strict typed API boundary, TanStack Query server state, React Hook Form + Zod, 23 behavioural tests, passing checks, and a verified production build. |
+| Engineering (E1–E5) | Strict typed API boundary, TanStack Query server state, React Hook Form + Zod, 24 behavioural tests, passing checks, and a verified production build. |
 | Deployment (E6) | The static artifact and production MSW worker are build-ready; a public URL is still pending. |
 
 ## Project structure
@@ -119,7 +119,7 @@ MSW response overrides; no permanent debug control ships in the main UI.
 
 ## Tests
 
-Latest verified result: **23 tests in 5 files pass**, together with ESLint,
+Latest verified result: **24 tests in 5 files pass**, together with ESLint,
 strict TypeScript and the production build.
 
 The suite includes the three mandatory E4 behaviours:

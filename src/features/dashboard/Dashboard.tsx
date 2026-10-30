@@ -6,7 +6,7 @@ import {
   fetchTransactions,
   queryKeys,
 } from '../../api/queries'
-import type { Account, Segment, Transaction } from '../../api/types'
+import type { Account, Customer, Segment, Transaction } from '../../api/types'
 import { formatMoney, formatShortDate } from '../../lib/format'
 import {
   PreferenceControls,
@@ -186,10 +186,7 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
 
 interface DashboardContentProps {
   accounts: Account[]
-  customer: {
-    dailyTransferLimit: number
-    transferredToday: number
-  }
+  customer: Customer
   onNewTransfer: () => void
   transactions: Transaction[]
 }
@@ -225,7 +222,7 @@ function DashboardContent({
     <main id="main-content" className="dashboard-main">
       <section className="welcome" aria-labelledby="welcome-title">
         <p className="eyebrow">Overview</p>
-        <h1 id="welcome-title">Good evening, Ava</h1>
+        <h1 id="welcome-title">Good evening, {customer.firstName}</h1>
       </section>
 
       <section className="balance-hero" aria-labelledby="total-title">

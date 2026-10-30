@@ -55,6 +55,13 @@ Last updated: 2026-10-30 (Asia/Singapore)
 - Expanded integration coverage for failed-send value retention and retry, duplicate activation, payee-load retry, new-recipient masking/request shape, and validation accessibility. The suite now has 17 passing tests.
 - Attempted interactive desktop/mobile browser verification. The local production server and worker loaded, but the host denied Chrome's required macOS Mach-port access; visual, console, focus, and overflow checks remain a named manual step.
 
+### 2026-10-30 — delivery handoff prepared
+
+- Replaced the starter README with the assessment handoff: requirement coverage, local commands, architecture, deliberate trade-offs, state handling, test evidence, AI disclosure, and known gaps.
+- Added a least-privilege GitHub Actions quality gate for pushes and pull requests. It uses Node 22, locked installation, `npm run check`, the production build, a non-empty worker assertion, concurrency cancellation, and a seven-day `dist` artifact.
+- Added executable focus assertions for the Recipient, Amount, and success headings to supplement the browser checklist.
+- Kept deployment separate from CI: no hosting provider, production environment, or `main` merge was assumed from the feature branch.
+
 ## Decisions
 
 | ID | Decision | Reason | Status |
@@ -74,6 +81,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | D-013 | Acquire the duplicate-submit lock synchronously before validation. | Validation is asynchronous; locking afterward leaves a same-tick race that can send money twice. | Active |
 | D-014 | Use a true single-column account list below 640 px. | This follows D8 literally and avoids making horizontal scrolling part of the core mobile interaction. | Active |
 | D-015 | Keep server field messages in a dedicated review-alert list while also mapping known paths into React Hook Form. | Nested and unknown backend messages remain visible on Review, and known messages remain linked to their fields when the user goes Back. | Active |
+| D-016 | Keep CI provider-neutral and deployment as an explicit later stage. | Quality checks can run on every branch/PR, while publishing requires a selected hosting target and controlled main-branch merge. | Active |
 
 ## Problems and investigations
 
@@ -108,10 +116,9 @@ Last updated: 2026-10-30 (Asia/Singapore)
 
 ## Next steps
 
-1. Replace the starter README with the assessment runbook, decisions, state coverage, test evidence, AI disclosure, and known limitations.
-2. Add the planned CI quality gate and document deployment prerequisites without merging to `main` prematurely.
-3. Run a normal-browser desktop/mobile/keyboard matrix when a usable browser or deployed URL is available.
-4. Complete deployment after the repository/hosting target and main-branch merge are confirmed.
+1. Confirm the pushed GitHub Actions run and review the feature branch before merge.
+2. Run a normal-browser desktop/mobile/keyboard matrix when a usable browser or deployed URL is available.
+3. Complete deployment after the repository/hosting target and main-branch merge are confirmed.
 
 ## Deferred and future work
 

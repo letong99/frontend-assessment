@@ -26,10 +26,16 @@ async function reachAmountStep(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole('heading', { name: 'Good evening, Ava' })
   await user.click(screen.getByRole('button', { name: /New transfer/ }))
 
+  const recipientHeading = await screen.findByRole('heading', {
+    name: 'Who are you sending to?',
+  })
+  await waitFor(() => expect(recipientHeading).toHaveFocus())
+
   const jamie = await screen.findByRole('radio', { name: /Jamie Tan/ })
   await user.click(jamie)
   await user.click(screen.getByRole('button', { name: 'Continue' }))
-  await screen.findByRole('heading', { name: 'How much?' })
+  const amountHeading = await screen.findByRole('heading', { name: 'How much?' })
+  await waitFor(() => expect(amountHeading).toHaveFocus())
 }
 
 beforeEach(() => {
@@ -112,9 +118,10 @@ describe('Meridian transfer flow', () => {
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     await user.click(screen.getByRole('button', { name: 'Confirm transfer' }))
 
-    expect(
-      await screen.findByRole('heading', { name: 'Transfer sent' }),
-    ).toBeInTheDocument()
+    const successHeading = await screen.findByRole('heading', {
+      name: 'Transfer sent',
+    })
+    await waitFor(() => expect(successHeading).toHaveFocus())
   })
 
   it('recovers when saved payees fail to load', async () => {

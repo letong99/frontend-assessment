@@ -75,6 +75,13 @@ Last updated: 2026-10-30 (Asia/Singapore)
 - Removed the literal customer name from the dashboard greeting. The fixed salutation remains requirement copy, while the first name now comes from `GET /api/customer` through the existing typed React Query boundary.
 - Added a regression test that overrides the customer response with `Mei Lin` and proves the heading renders `Good evening, Mei` rather than the seed customer name.
 
+### 2026-10-30 — idle-refetch blank state fixed
+
+- Reproduced the protocol condition behind the header-only page: without browser MSW interception, Vite answers `/api/customer` with `index.html`, HTTP 200, and `text/html`.
+- Corrected `apiFetch` so successful endpoint responses must be top-level JSON objects. HTML, invalid JSON, `null`, arrays, and error envelopes with a 2xx status now reject as typed `ApiError` code `INVALID_RESPONSE`; malformed non-2xx responses remain typed `UNKNOWN` API errors.
+- Made the dashboard render state exhaustive: pending data shows skeletons, complete data shows content, and any settled state missing required data shows the Retry error. A background refetch error with prior data keeps that data visible.
+- Added four API-boundary unit tests plus dashboard tests for initial HTML fallback/recovery and the exact loaded-dashboard background-refetch failure.
+
 ## Decisions
 
 | ID | Decision | Reason | Status |
@@ -97,6 +104,8 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | D-016 | Keep CI provider-neutral and deployment as an explicit later stage. | Quality checks can run on every branch/PR, while publishing requires a selected hosting target and controlled main-branch merge. | Active |
 | D-017 | Reserve the full dashboard error screen for queries without usable data. | React Query retains prior data after a background refetch failure; keeping it avoids unnecessary layout replacement while the transfer dialog owns synchronization recovery. | Active |
 | D-018 | Derive customer identity shown in the dashboard from the customer API response. | The seed currently contains Ava, but personalization must follow server data rather than a component literal. | Active |
+| D-019 | Enforce the supplied API's top-level JSON-object contract at the shared fetch boundary. | Vite's SPA fallback is HTTP 200 HTML; accepting a parse failure as successful `null` data corrupts query state silently. | Active |
+| D-020 | Make dashboard rendering exhaustive based on pending state and complete required data. | No settled query-state combination should render only the header; prior data remains useful during a background failure. | Active |
 
 ## Problems and investigations
 
@@ -113,6 +122,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | P-009 | Chrome could not launch through the available browser bridge because the host denied macOS Mach-port access. | Automated interactive responsive/keyboard/console evidence could not be collected in this environment. | Verified the local server and worker via HTTP, kept the limitation explicit, and left the browser matrix for a normal local browser or deployed URL. Temporary profiles were moved to Trash. | Open |
 | P-010 | An induced post-success refetch failure initially replaced the populated dashboard with its initial-load error underneath the success dialog. | It created a second alert and discarded useful stale data during a recoverable background failure. | The dashboard now renders its full error only when a failed query has no data; the transfer warning and retry remain responsible for synchronization recovery. | Resolved |
 | P-011 | The dashboard greeting embedded `Ava` directly in JSX. | A different signed-in customer response would still display the seed customer's name. | Passed the typed `Customer` object into the dashboard content and rendered `customer.firstName`; added a non-Ava API regression test. | Resolved |
+| P-012 | After an idle tab refetched, an un-intercepted `/api/*` request could receive Vite's 200 HTML fallback; JSON parsing was swallowed and `null` cached as successful data. | The dashboard matched neither loading, error, nor content and displayed only its header. | Reject invalid successful responses at `apiFetch`, preserve last good query data on refetch failure, and route missing settled data to Retry. | Resolved |
 
 ## Verification evidence
 
@@ -125,8 +135,10 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | `npm ci` | Passed | 319 packages installed; 0 vulnerabilities. Deprecation notices are transitive/tooling warnings and do not block the assessment. |
 | Baseline `npm run check` | Passed | ESLint, TypeScript, and 3 starter tests passed before implementation. |
 | Focused transfer integration | Passed | All 11 App scenarios pass, including required flows, focus/keyboard semantics, backend mapping, duplicate protection, empty payees, and refresh recovery. |
-| Hardened `npm run check` | Passed | ESLint, strict TypeScript, and all 24 tests across 5 files passed. |
+| Hardened `npm run check` | Passed | ESLint, strict TypeScript, and all 30 tests across 6 files passed. |
 | API-derived greeting | Passed | A customer override with first name `Mei` renders `Good evening, Mei` and no Ava heading. |
+| Invalid 2xx response handling | Passed | Unit tests reject HTML, `null`, and error envelopes returned with HTTP 200; malformed HTTP failures remain typed. |
+| Idle/focus refetch regression | Passed | Initial HTML fallback reaches Retry and recovers; background HTML refetch retains the previously loaded dashboard. |
 | Hardened `npm run build` | Passed | Vite production build transformed 420 modules and completed successfully. Rollup only reported non-blocking annotation warnings from Zod dependencies. |
 | Worker artifact | Passed | `dist/mockServiceWorker.js` exists and is non-empty (9,666 bytes). |
 | Local production HTTP smoke | Passed | Vite served the built page at `127.0.0.1:4173`; the HTML and 9,666-byte mock worker were reachable. |

@@ -3,6 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { queryKeys } from '../../api/queries'
 import { server } from '../../test/setup'
 import Dashboard from './Dashboard'
 
@@ -41,11 +42,13 @@ function renderDashboard() {
     },
   })
 
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <Dashboard onNewTransfer={vi.fn()} />
     </QueryClientProvider>,
   )
+
+  return { ...view, queryClient }
 }
 
 beforeEach(() => {
@@ -82,6 +85,77 @@ describe('Dashboard', () => {
     expect(
       screen.queryByRole('heading', { name: 'Good evening, Ava' }),
     ).not.toBeInTheDocument()
+  })
+
+  it('shows Retry and recovers when a successful response contains HTML', async () => {
+    let customerRequests = 0
+    server.use(
+      http.get('*/api/customer', () => {
+        customerRequests += 1
+        if (customerRequests === 1) {
+          return HttpResponse.text('<!doctype html><title>Vite</title>', {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' },
+          })
+        }
+
+        return HttpResponse.json({
+          customer: {
+            id: 'cus_001',
+            firstName: 'Ava',
+            lastName: 'Chen',
+            email: 'ava.chen@example.com',
+            segment: 'retail',
+            dailyTransferLimit: 5000,
+            transferredToday: 0,
+          },
+        })
+      }),
+    )
+
+    const user = userEvent.setup()
+    renderDashboard()
+
+    expect(
+      await screen.findByRole('heading', {
+        name: "We couldn't load your dashboard.",
+      }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Total available')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Good evening, Ava' }),
+    ).toBeInTheDocument()
+    expect(customerRequests).toBe(2)
+  })
+
+  it('retains loaded content when a background response contains HTML', async () => {
+    const { queryClient } = renderDashboard()
+    await screen.findByRole('heading', { name: 'Good evening, Ava' })
+
+    server.use(
+      http.get('*/api/customer', () =>
+        HttpResponse.text('<!doctype html><title>Vite</title>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/html' },
+        }),
+      ),
+    )
+
+    await queryClient.refetchQueries({ queryKey: queryKeys.customer })
+
+    expect(
+      screen.getByRole('heading', { name: 'Good evening, Ava' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Total available')).toBeInTheDocument()
+    expect(
+      screen.queryByText("We couldn't load your dashboard."),
+    ).not.toBeInTheDocument()
+    expect(queryClient.getQueryState(queryKeys.customer)).toMatchObject({
+      status: 'error',
+    })
   })
 
   it('loads account data and filters transactions by category', async () => {

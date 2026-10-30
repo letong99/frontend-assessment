@@ -41,7 +41,7 @@ The production artifact must include `dist/mockServiceWorker.js`; see
 | Transfer (T1–T8) | Native modal dialog, saved-payee search or new-recipient entry, amount/account/note step, review and editing, guarded POST, truthful success/failure states, dashboard refresh, linked errors, announcements, radio-keyboard semantics, and step/focus restoration. |
 | Validation | One contextual Zod schema covers recipient, account, amount, balance, daily-limit and note rules for blur and Continue/submit validation. |
 | Themes (TH1–TH3) | System-aware pre-paint theme, persistent light/dark and Retail/Premium controls, root data attributes, semantic supplied tokens, and visible focus states. |
-| Engineering (E1–E5) | Strict typed API boundary, TanStack Query server state, React Hook Form + Zod, 24 behavioural tests, passing checks, and a verified production build. |
+| Engineering (E1–E5) | Strict typed API boundary, TanStack Query server state, React Hook Form + Zod, 30 behavioural tests, passing checks, and a verified production build. |
 | Deployment (E6) | The static artifact and production MSW worker are build-ready; a public URL is still pending. |
 
 ## Project structure
@@ -101,6 +101,9 @@ Planning and implementation evidence is kept in
 - Dashboard request failure shows `We couldn't load your dashboard.` and Retry
   refetches all three resources. This recovery is covered by a behavioural
   test.
+- If an un-intercepted development API request receives Vite's HTML fallback
+  with HTTP 200, the API boundary rejects it as `INVALID_RESPONSE`. An initial
+  failure reaches Retry; a background failure retains the last good dashboard.
 - No accounts, no transactions, no saved payees, no transaction-search matches
   and no payee-search matches each have a distinct empty state. A new recipient
   remains available when saved payees are empty.
@@ -119,7 +122,7 @@ MSW response overrides; no permanent debug control ships in the main UI.
 
 ## Tests
 
-Latest verified result: **24 tests in 5 files pass**, together with ESLint,
+Latest verified result: **30 tests in 6 files pass**, together with ESLint,
 strict TypeScript and the production build.
 
 The suite includes the three mandatory E4 behaviours:
@@ -135,7 +138,8 @@ double activation producing one POST, saved-payee recovery, new-recipient
 masking/request shape, transaction search/no-match behaviour, preferences,
 validation rules, backend field mapping, dialog close/focus restoration,
 keyboard radio selection, empty API results, post-success refresh recovery,
-and money/date formatting.
+invalid-successful API responses, background refetch retention, and money/date
+formatting.
 
 ```bash
 npm run check

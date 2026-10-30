@@ -36,6 +36,7 @@ async function bootstrap() {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { staleTime: 30_000, retry: 1 },
+      mutations: { retry: false },
     },
   })
 

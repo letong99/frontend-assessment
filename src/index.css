@@ -1,21 +1,33 @@
 @import '../brief/design-tokens.css';
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-html,
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--bg);
+}
+
 body,
 #root {
-  min-height: 100%;
+  min-height: 100vh;
 }
 
 body {
   margin: 0;
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
+  font-size: var(--text-base);
   line-height: var(--leading-normal);
+  transition:
+    background-color var(--duration-base) var(--ease-out),
+    color var(--duration-base) var(--ease-out);
 }
 
 button,
@@ -25,54 +37,75 @@ textarea {
   font: inherit;
 }
 
-code {
-  background: var(--surface-muted);
-  border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.9em;
-  padding: 0.1em 0.35em;
+button,
+input,
+select,
+textarea,
+a {
+  -webkit-tap-highlight-color: transparent;
 }
 
-.starter {
-  margin: 0 auto;
-  max-width: 720px;
-  padding: var(--space-8) var(--space-4);
+button {
+  min-height: var(--tap-target);
 }
 
-.starter-header {
-  align-items: baseline;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  gap: var(--space-4);
-  justify-content: space-between;
-  padding-bottom: var(--space-3);
+button:not(:disabled),
+input:not(:disabled),
+select:not(:disabled),
+textarea:not(:disabled) {
+  cursor: pointer;
 }
 
-.starter-header strong {
-  font-size: var(--text-lg);
+input,
+select,
+textarea {
+  cursor: text;
 }
 
-.starter-header span {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
-.starter-main {
-  padding-top: var(--space-6);
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
-.starter-main h1 {
-  font-size: var(--text-2xl);
-  letter-spacing: var(--tracking-tight);
-  line-height: var(--leading-tight);
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
 }
 
-.starter-main p,
-.starter-main li {
-  color: var(--text-muted);
+.amount,
+.account-number {
+  font-variant-numeric: tabular-nums;
 }
 
-.status {
-  color: var(--positive);
-  font-weight: var(--weight-semibold);
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

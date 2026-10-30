@@ -99,12 +99,14 @@ Status starts as `planned` and should move to `verified` only with the stated ev
 5. Render all account cards; exclude credit from available funds and label it `Amount due`.
 6. Render the newest eight transactions. Humanize category text for display while searching raw description/category case-insensitively.
 7. Filter the eight loaded rows locally. For a non-empty search, expose the match count and a clear action. A filtered zero uses the exact required no-match state.
-8. Show remaining daily limit derived from customer data. The textual value is required for post-transfer visibility; the visual progress bar remains optional.
-9. If any essential initial dashboard query fails, show the common required error. Retry refetches all three queries concurrently.
+8. When the response `total` exceeds the eight loaded rows, offer `View all` without delaying the required initial dashboard. Lazily request the endpoint maximum (`limit=50`), then search and paginate the loaded history in groups of eight with an announced visible range and bounded Previous/Next controls.
+9. Show remaining daily limit derived from customer data. The textual value is required for post-transfer visibility; the visual progress bar remains optional.
+10. If any essential initial dashboard query fails, show the common required error. Retry refetches all three queries concurrently. A later history-load failure is local to the transaction component and preserves the initial eight rows.
 
 #### Empty and degraded states
 
 - Zero transactions with no active search: show a neutral `No recent transactions yet.` state.
+- Expanded-history request failure: retain the initial eight rows and show `We couldn't load all transactions.` with Retry.
 - Zero saved payees: keep `Send to someone new` available.
 - Payee-query failure: show an inline Retry inside the dialog without failing the dashboard; new-recipient entry remains available.
 - No eligible deposit account: prevent continuing to Amount and explain that no transfer source is available.
@@ -254,7 +256,8 @@ The assessment backend is MSW, not a remote service. Browser, Vitest, and the op
 | --- | --- | --- | --- |
 | `GET /api/customer` | Name, segment default, limit, used amount | Key `['customer']`; pass query `signal`; no automatic assessment retry | Refetch after transfer |
 | `GET /api/accounts` | Cards, total, sources, balance validation | Key `['accounts']`; pass `signal`; no automatic assessment retry | Refetch after transfer |
-| `GET /api/transactions?limit=8` | Dashboard rows and search source | Key `['transactions', { limit: 8 }]`; pass `signal` | Refetch after transfer |
+| `GET /api/transactions?limit=8` | Required initial dashboard rows and search source | Key `['transactions', { limit: 8 }]`; pass `signal` | Refetch after transfer |
+| `GET /api/transactions?limit=50` | Lazy full supplied history for eight-row client pages | Key `['transactions', { limit: 50 }]`; enabled by `View all`; pass `signal`; inline Retry | Refetch after transfer when active |
 | `GET /api/payees` | Saved-recipient selection | Key `['payees']`; enabled only while dialog is open; local Retry | Independent of dashboard |
 | `POST /api/transfers` | Execute transfer | No retry or cancellation after dispatch; explicit UI lock | Send exactly one of `payeeId`/`recipient`; map structured errors |
 | `GET /api/health` | Manual worker smoke only | Not part of final UI state | Starter health screen/test is replaced |
@@ -390,6 +393,7 @@ Replace the starter health test; health is no longer the application behavior.
 ### Additional high-value tests
 
 - transaction search by description/category, count, filtered-empty, and clear;
+- lazy full-history loading, eight-row page boundaries, older-record search, page reset, and local history-load failure;
 - true empty transaction list;
 - recipient branch and 8-digit/name/bank validation;
 - amount boundaries: blank, 0.99, 1, 2 versus 3 decimals, exact/over balance, exact/over limit;

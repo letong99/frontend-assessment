@@ -3,7 +3,10 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { queryKeys } from '../../api/queries'
+import {
+  queryKeys,
+  TRANSACTION_HISTORY_LIMIT,
+} from '../../api/queries'
 import { server } from '../../test/setup'
 import Dashboard from './Dashboard'
 
@@ -194,6 +197,92 @@ describe('Dashboard', () => {
     ).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Clear search' }))
     expect(screen.getByText('FairPrice Finest')).toBeInTheDocument()
+  })
+
+  it('loads and paginates the complete supplied transaction history on request', async () => {
+    const user = userEvent.setup()
+    const { queryClient } = renderDashboard()
+
+    await screen.findByRole('heading', { name: 'Good evening, Ava' })
+    expect(
+      screen.getByRole('button', { name: 'View all 15 transactions' }),
+    ).toBeInTheDocument()
+    expect(
+      queryClient.getQueryData(
+        queryKeys.transactions(TRANSACTION_HISTORY_LIMIT),
+      ),
+    ).toBeUndefined()
+
+    await user.click(
+      screen.getByRole('button', { name: 'View all 15 transactions' }),
+    )
+
+    expect(await screen.findByText('Showing 1–8 of 15')).toBeInTheDocument()
+    expect(
+      queryClient.getQueryData(
+        queryKeys.transactions(TRANSACTION_HISTORY_LIMIT),
+      ),
+    ).toMatchObject({ total: 15 })
+    expect(screen.getByText('FairPrice Finest')).toBeInTheDocument()
+    expect(screen.queryByText('Transfer to Jamie Tan')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(screen.getByText('Showing 9–15 of 15')).toBeInTheDocument()
+    expect(screen.getByText('Transfer to Jamie Tan')).toBeInTheDocument()
+    expect(screen.getByText('PayNow to Priya Nair')).toBeInTheDocument()
+    expect(screen.queryByText('FairPrice Finest')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search transactions' }),
+      'Guardian',
+    )
+
+    expect(screen.getByText('Guardian')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('1 result')
+    expect(screen.getByText('Showing 1–1 of 1')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Clear' }))
+
+    expect(screen.getByText('Showing 1–8 of 15')).toBeInTheDocument()
+    expect(screen.getByText('FairPrice Finest')).toBeInTheDocument()
+  })
+
+  it('keeps the recent list usable when loading all transactions fails', async () => {
+    const user = userEvent.setup()
+    renderDashboard()
+
+    await screen.findByRole('heading', { name: 'Good evening, Ava' })
+    server.use(
+      http.get('*/api/transactions', () =>
+        HttpResponse.json(
+          { error: { code: 'INTERNAL_ERROR', message: 'Down' } },
+          { status: 500 },
+        ),
+      ),
+    )
+
+    await user.click(
+      screen.getByRole('button', { name: 'View all 15 transactions' }),
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "We couldn't load all transactions.",
+    )
+    expect(screen.getByText('FairPrice Finest')).toBeInTheDocument()
+    expect(screen.getByText('Uniqlo')).toBeInTheDocument()
+    expect(screen.queryByText('Transfer to Jamie Tan')).not.toBeInTheDocument()
+
+    server.resetHandlers()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('Showing 1–8 of 15')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('recovers when Retry refetches a failed dashboard request', async () => {

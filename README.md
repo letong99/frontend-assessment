@@ -5,7 +5,8 @@
 - Run locally: `npm ci && npm run dev`
 
 Meridian is a responsive, accessible banking dashboard for Ava Chen. It shows
-her accounts and eight newest transactions, supports local transaction search,
+her accounts and eight newest transactions by default, can page through the
+complete supplied transaction history, supports local transaction search,
 light/dark and Retail/Premium preferences, and a complete three-step transfer
 flow backed by the supplied in-browser mock API.
 
@@ -37,11 +38,11 @@ The production artifact must include `dist/mockServiceWorker.js`; see
 
 | Area | Implemented behaviour |
 | --- | --- |
-| Dashboard (D1–D8) | Concurrent loading skeletons, exact greeting and totals, three accounts, eight newest transactions, local description/category search with result and empty states, retryable dashboard failure, and a one-column 360–390 px layout with a fixed transfer action. |
+| Dashboard (D1–D8) | Concurrent loading skeletons, exact greeting and totals, three accounts, eight newest transactions with lazy full-history pagination, local description/category search with result and empty states, retryable dashboard failure, and a one-column 360–390 px layout with a fixed transfer action. |
 | Transfer (T1–T8) | Native modal dialog, saved-payee search or new-recipient entry, amount/account/note step, review and editing, guarded POST, truthful success/failure states, dashboard refresh, linked errors, announcements, radio-keyboard semantics, and step/focus restoration. |
 | Validation | One contextual Zod schema covers recipient, account, amount, balance, daily-limit and note rules for blur and Continue/submit validation. |
 | Themes (TH1–TH3) | System-aware pre-paint theme, persistent light/dark and Retail/Premium controls, root data attributes, semantic supplied tokens, and visible focus states. |
-| Engineering (E1–E5) | Strict typed API boundary, TanStack Query server state, React Hook Form + Zod, 30 behavioural tests, passing checks, and a verified production build. |
+| Engineering (E1–E5) | Strict typed API boundary, TanStack Query server state, React Hook Form + Zod, 32 behavioural tests, passing checks, and a verified production build. |
 | Deployment (E6) | The static artifact and production MSW worker are build-ready; a public URL is still pending. |
 
 ## Project structure
@@ -70,18 +71,20 @@ Planning and implementation evidence is kept in
   payee data. Components do not copy responses into UI state. Query functions
   accept cancellation signals, reads use explicit retry policies, and transfer
   mutations never retry automatically.
-- **Search:** D6 filters the eight records returned by
-  `GET /api/transactions?limit=8` in the browser. The list is deliberately
-  bounded, so local filtering is immediate and avoids refetching on each
-  keystroke. A larger production ledger would use debounced server search and
-  pagination.
+- **History and search:** the required initial view filters the eight records
+  returned by `GET /api/transactions?limit=8`. `View all` lazily requests the
+  supplied endpoint maximum (`limit=50`), then pages and searches that result
+  locally in groups of eight. This exposes all 15 supplied records without
+  changing the API or slowing the required initial load. A production ledger
+  needs cursor pagination and debounced server search beyond 50 records.
 - **Transfer consistency:** one React Hook Form instance retains values across
   Recipient, Amount and Review. A single contextual Zod schema is the rule
   source. The duplicate-submit lock is acquired before the first asynchronous
   validation boundary.
 - **After a transfer:** HTTP 201 makes the success message authoritative. The
-  app then explicitly refetches customer, accounts and `transactions(8)` and
-  enables return only after synchronization succeeds. A refresh failure does
+  app then explicitly refetches customer, accounts and every active
+  transaction-list query and enables return only after synchronization
+  succeeds. A refresh failure does
   not misreport the completed transfer as failed; it presents a separate retry.
   Refetching was preferred over hand-patching three caches because the supplied
   API is small and remains the source of truth.
@@ -107,6 +110,8 @@ Planning and implementation evidence is kept in
 - No accounts, no transactions, no saved payees, no transaction-search matches
   and no payee-search matches each have a distinct empty state. A new recipient
   remains available when saved payees are empty.
+- If lazy full-history loading fails, the eight recent transactions remain
+  usable and an inline Retry action is shown.
 - Transfer preparation and payee loading have progress states. Payee failure
   has its own Retry action. Backend field messages remain visible in the review
   alert and known paths are also linked to their fields.

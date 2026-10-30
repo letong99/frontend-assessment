@@ -305,7 +305,7 @@ export default function TransferDialog({
           { throwOnError: true },
         ),
         queryClient.refetchQueries(
-          { queryKey: queryKeys.transactions(8), type: 'active' },
+          { queryKey: queryKeys.transactionsRoot, type: 'active' },
           { throwOnError: true },
         ),
       ])

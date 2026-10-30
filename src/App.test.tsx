@@ -9,6 +9,11 @@ import {
 import userEvent from '@testing-library/user-event'
 import { delay, http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
+import {
+  queryKeys,
+  TRANSACTION_HISTORY_LIMIT,
+} from './api/queries'
+import type { TransactionsResponse } from './api/types'
 import App from './App'
 import { formatMoney } from './lib/format'
 import { server } from './test/setup'
@@ -21,11 +26,13 @@ function renderApp() {
     },
   })
 
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <App />
     </QueryClientProvider>,
   )
+
+  return { ...view, queryClient }
 }
 
 async function reachAmountStep(user: ReturnType<typeof userEvent.setup>) {
@@ -456,9 +463,14 @@ describe('Meridian transfer flow', () => {
     ).toContain(formatMoney(4160.55))
   })
 
-  it('shows success and refreshes dashboard data after a transfer', async () => {
+  it('shows success and refreshes recent and expanded transaction data', async () => {
     const user = userEvent.setup()
-    renderApp()
+    const { queryClient } = renderApp()
+    await screen.findByRole('heading', { name: 'Good evening, Ava' })
+    await user.click(
+      screen.getByRole('button', { name: 'View all 15 transactions' }),
+    )
+    await screen.findByText('Showing 1–8 of 15')
     await reachAmountStep(user)
 
     await user.type(screen.getByLabelText('Amount'), '120')
@@ -481,6 +493,14 @@ describe('Meridian transfer flow', () => {
     await waitFor(() => expect(backToDashboard).toBeEnabled())
     await user.click(backToDashboard)
 
+    expect(screen.getByText('Showing 1–8 of 16')).toBeInTheDocument()
+    const expandedTransactions = queryClient.getQueryData<TransactionsResponse>(
+      queryKeys.transactions(TRANSACTION_HISTORY_LIMIT),
+    )
+    expect(expandedTransactions).toMatchObject({ total: 16 })
+    expect(expandedTransactions?.transactions[0]).toMatchObject({
+      description: 'Transfer to Jamie Tan',
+    })
     expect(screen.getByText('Transfer to Jamie Tan')).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { name: 'Everyday Checking' }).parentElement

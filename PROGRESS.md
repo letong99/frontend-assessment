@@ -89,6 +89,15 @@ Last updated: 2026-10-30 (Asia/Singapore)
 - Added production acceptance scenarios for concurrent funds/limit contention, duplicate requests, lost responses, stale client data, unauthorized access, injected partial failures, money boundaries and exactly-once audit/outbox effects.
 - Recorded the open decisions and accountable disciplines that must close them before a real transfer API is integrated.
 
+### 2026-10-30 — complete transaction history pagination
+
+- Preserved the assessment-required concurrent `limit=8` initial request and eight newest rows.
+- Added a lazy `View all 15 transactions` path that uses the supplied endpoint's existing `limit=50` capability, then pages the full supplied history in groups of eight without changing the endpoint, handler, or seed data.
+- Added accessible Previous/Next controls, a live visible-range summary, page reset on search changes, narrow-screen wrapping, and full-history search after expansion.
+- Kept the recent list usable if history loading fails and added an inline Retry state.
+- Changed post-transfer synchronization to refetch every active transaction query variant so both recent and expanded views remain authoritative.
+- Added behavioral coverage for lazy loading, page boundaries, older-record discovery/search, page reset, cache isolation, and degraded history loading.
+
 ## Decisions
 
 | ID | Decision | Reason | Status |
@@ -98,7 +107,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | D-003 | Treat `brief/candidate-brief.md` and `brief/api-contract.md` as authoritative over the implementation plan. | Prevents planning drift from changing the supplied contract. | Active |
 | D-004 | Use the user-local Node `v22.23.4` via an explicit PATH for project commands. | Meets the required runtime without modifying global shell/system configuration. | Active |
 | D-005 | Use React Query as the only server-state boundary, with feature-scoped query keys and cancellation-aware fetchers. | Keeps API lifecycle/error handling consistent and makes post-mutation synchronization explicit. | Active |
-| D-006 | Keep transaction filtering local to the eight records returned by `GET /api/transactions?limit=8`. | The API contract provides a bounded dashboard list and no search endpoint; local filtering is deterministic and sufficient. | Active |
+| D-006 | Keep transaction filtering local to the eight records returned by `GET /api/transactions?limit=8`. | This satisfied the original assessment scope before full-history browsing was requested. | Superseded by D-022 |
 | D-007 | Let an explicit stored theme/segment preference override defaults; otherwise use the system theme and API customer segment. | Preserves user intent while supplying sensible first-visit behavior. | Active |
 | D-008 | Use the platform `<dialog>` element instead of adding a dialog dependency. | The required modal semantics, Escape handling, backdrop, and focus containment are available without increasing the assessment bundle. | Active |
 | D-009 | Use one React Hook Form instance and one contextual Zod rule source across all transfer steps. | Prevents validation drift and retains user values when moving backward to edit. | Active |
@@ -114,6 +123,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | D-019 | Enforce the supplied API's top-level JSON-object contract at the shared fetch boundary. | Vite's SPA fallback is HTTP 200 HTML; accepting a parse failure as successful `null` data corrupts query state silently. | Active |
 | D-020 | Make dashboard rendering exhaustive based on pending state and complete required data. | No settled query-state combination should render only the header; prior data remains useful during a background failure. | Active |
 | D-021 | Keep the supplied assessment endpoints unchanged and document production transaction safety/authentication as a backend-collaboration contract. | Frontend locking is a UX safeguard; atomicity, authoritative validation, authorization, idempotency and reconciliation require an agreed backend boundary. | Active |
+| D-022 | Preserve the required eight-row initial query, then lazy-load up to 50 records and paginate locally in groups of eight. | It exposes the complete 15-record supplied history, avoids a nested-scroll accessibility trap, keeps initial loading bounded, and requires no endpoint changes. | Active |
 
 ## Problems and investigations
 
@@ -132,6 +142,7 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | P-011 | The dashboard greeting embedded `Ava` directly in JSX. | A different signed-in customer response would still display the seed customer's name. | Passed the typed `Customer` object into the dashboard content and rendered `customer.firstName`; added a non-Ava API regression test. | Resolved |
 | P-012 | After an idle tab refetched, an un-intercepted `/api/*` request could receive Vite's 200 HTML fallback; JSON parsing was swallowed and `null` cached as successful data. | The dashboard matched neither loading, error, nor content and displayed only its header. | Reject invalid successful responses at `apiFetch`, preserve last good query data on refetch failure, and route missing settled data to Retry. | Resolved |
 | P-013 | The assessment mock has no authentication, durable atomic transaction or idempotency; its contract permits the same request to move money twice. | It must never be represented as safe for real financial processing, and frontend controls cannot close that trust gap. | Left the assessment implementation unchanged and captured owners, proposed production semantics, processing invariants and joint acceptance tests in `DEVELOPMENT_PLAN.md` §13. | Deferred to real backend collaboration |
+| P-014 | `GET /api/transactions` accepts at most 50 rows and has no cursor/offset parameter. | The complete supplied 15-record dataset is available, but a production history over 50 records cannot be fully browsed with this contract. | Use the existing maximum only for the assessment; design cursor pagination and server-side search with the backend team before production integration. | Deferred to real backend collaboration |
 
 ## Verification evidence
 
@@ -144,7 +155,8 @@ Last updated: 2026-10-30 (Asia/Singapore)
 | `npm ci` | Passed | 319 packages installed; 0 vulnerabilities. Deprecation notices are transitive/tooling warnings and do not block the assessment. |
 | Baseline `npm run check` | Passed | ESLint, TypeScript, and 3 starter tests passed before implementation. |
 | Focused transfer integration | Passed | All 11 App scenarios pass, including required flows, focus/keyboard semantics, backend mapping, duplicate protection, empty payees, and refresh recovery. |
-| Hardened `npm run check` | Passed | ESLint, strict TypeScript, and all 30 tests across 6 files passed. |
+| Hardened `npm run check` | Passed | ESLint, strict TypeScript, and all 32 tests across 6 files passed. |
+| Transaction-history pagination | Passed | Focused tests prove lazy cache separation, all 15 supplied records across two pages, oldest-record access, older-record search/page reset, disabled page bounds, history-load recovery, and post-transfer refresh of the active 50-row cache. |
 | API-derived greeting | Passed | A customer override with first name `Mei` renders `Good evening, Mei` and no Ava heading. |
 | Invalid 2xx response handling | Passed | Unit tests reject HTML, `null`, and error envelopes returned with HTTP 200; malformed HTTP failures remain typed. |
 | Idle/focus refetch regression | Passed | Initial HTML fallback reaches Retry and recovers; background HTML refetch retains the previously loaded dashboard. |

@@ -5,6 +5,8 @@ import {
   fetchCustomer,
   fetchTransactions,
   queryKeys,
+  RECENT_TRANSACTIONS_LIMIT,
+  TRANSACTION_HISTORY_LIMIT,
 } from '../../api/queries'
 import type { Account, Customer, Segment, Transaction } from '../../api/types'
 import { formatMoney, formatShortDate } from '../../lib/format'
@@ -187,17 +189,32 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
 interface DashboardContentProps {
   accounts: Account[]
   customer: Customer
+  historyError: boolean
+  historyLoading: boolean
   onNewTransfer: () => void
+  onRetryHistory: () => void
+  onViewHistory: () => void
   transactions: Transaction[]
+  transactionsTotal: number
+  viewingHistory: boolean
 }
+
+const TRANSACTIONS_PER_PAGE = 8
 
 function DashboardContent({
   accounts,
   customer,
+  historyError,
+  historyLoading,
   onNewTransfer,
+  onRetryHistory,
+  onViewHistory,
   transactions,
+  transactionsTotal,
+  viewingHistory,
 }: DashboardContentProps) {
   const [search, setSearch] = useState('')
+  const [transactionPage, setTransactionPage] = useState(1)
   const depositAccounts = accounts.filter((account) => account.type !== 'credit')
   const totalAvailable = depositAccounts.reduce(
     (total, account) => total + account.balance,
@@ -217,6 +234,32 @@ function DashboardContent({
         transaction.category.toLowerCase().includes(normalizedSearch),
     )
   }, [normalizedSearch, transactions])
+  const pageCount = Math.max(
+    1,
+    Math.ceil(filteredTransactions.length / TRANSACTIONS_PER_PAGE),
+  )
+  const currentPage = Math.min(transactionPage, pageCount)
+  const pageStart = (currentPage - 1) * TRANSACTIONS_PER_PAGE
+  const visibleTransactions = viewingHistory
+    ? filteredTransactions.slice(
+        pageStart,
+        pageStart + TRANSACTIONS_PER_PAGE,
+      )
+    : filteredTransactions
+  const visibleRangeStart = filteredTransactions.length === 0 ? 0 : pageStart + 1
+  const visibleRangeEnd = Math.min(
+    pageStart + TRANSACTIONS_PER_PAGE,
+    filteredTransactions.length,
+  )
+  const canLoadHistory =
+    transactionsTotal > transactions.length && !viewingHistory && !historyError
+  const historyTruncated =
+    viewingHistory && transactionsTotal > transactions.length
+
+  function updateSearch(value: string) {
+    setSearch(value)
+    setTransactionPage(1)
+  }
 
   return (
     <main id="main-content" className="dashboard-main">
@@ -285,10 +328,10 @@ function DashboardContent({
                   type="search"
                   placeholder="Search transactions"
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => updateSearch(event.target.value)}
                 />
                 {normalizedSearch ? (
-                  <button type="button" onClick={() => setSearch('')}>
+                  <button type="button" onClick={() => updateSearch('')}>
                     Clear
                   </button>
                 ) : null}
@@ -305,18 +348,89 @@ function DashboardContent({
                 <button
                   className="button button--secondary"
                   type="button"
-                  onClick={() => setSearch('')}
+                  onClick={() => updateSearch('')}
                 >
                   Clear search
                 </button>
               </div>
             ) : (
-              <ul className="transaction-list">
-                {filteredTransactions.map((transaction) => (
+              <ul className="transaction-list" id="transaction-list">
+                {visibleTransactions.map((transaction) => (
                   <TransactionRow key={transaction.id} transaction={transaction} />
                 ))}
               </ul>
             )}
+
+            {canLoadHistory ? (
+              <div className="transaction-history-action">
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  disabled={historyLoading}
+                  onClick={onViewHistory}
+                >
+                  {historyLoading
+                    ? 'Loading all transactions…'
+                    : transactionsTotal <= TRANSACTION_HISTORY_LIMIT
+                      ? `View all ${transactionsTotal} transactions`
+                      : `View latest ${TRANSACTION_HISTORY_LIMIT} transactions`}
+                </button>
+              </div>
+            ) : null}
+
+            {historyError ? (
+              <div className="transaction-history-error" role="alert">
+                <span>We couldn't load all transactions.</span>
+                <button type="button" onClick={onRetryHistory}>
+                  Retry
+                </button>
+              </div>
+            ) : null}
+
+            {viewingHistory && filteredTransactions.length > 0 ? (
+              <div className="transaction-pagination">
+                <div className="transaction-pagination__summary">
+                  <p aria-live="polite" aria-atomic="true">
+                    Showing {visibleRangeStart}–{visibleRangeEnd} of{' '}
+                    {filteredTransactions.length}
+                  </p>
+                  {historyTruncated ? (
+                    <p>
+                      Only the latest {transactions.length} of{' '}
+                      {transactionsTotal} transactions are available.
+                    </p>
+                  ) : null}
+                </div>
+                {pageCount > 1 ? (
+                  <nav
+                    className="transaction-pagination__controls"
+                    aria-label="Transaction pages"
+                  >
+                    <button
+                      className="button button--secondary"
+                      type="button"
+                      aria-controls="transaction-list"
+                      disabled={currentPage === 1}
+                      onClick={() => setTransactionPage(currentPage - 1)}
+                    >
+                      Previous
+                    </button>
+                    <span aria-current="page">
+                      Page {currentPage} of {pageCount}
+                    </span>
+                    <button
+                      className="button button--secondary"
+                      type="button"
+                      aria-controls="transaction-list"
+                      disabled={currentPage === pageCount}
+                      onClick={() => setTransactionPage(currentPage + 1)}
+                    >
+                      Next
+                    </button>
+                  </nav>
+                ) : null}
+              </div>
+            ) : null}
           </section>
         </div>
 
@@ -337,6 +451,7 @@ function DashboardContent({
 }
 
 export default function Dashboard({ onNewTransfer }: DashboardProps) {
+  const [historyRequested, setHistoryRequested] = useState(false)
   const customerQuery = useQuery({
     queryKey: queryKeys.customer,
     queryFn: ({ signal }) => fetchCustomer(signal),
@@ -348,8 +463,16 @@ export default function Dashboard({ onNewTransfer }: DashboardProps) {
     retry: false,
   })
   const transactionsQuery = useQuery({
-    queryKey: queryKeys.transactions(8),
-    queryFn: ({ signal }) => fetchTransactions(signal, 8),
+    queryKey: queryKeys.transactions(RECENT_TRANSACTIONS_LIMIT),
+    queryFn: ({ signal }) =>
+      fetchTransactions(signal, RECENT_TRANSACTIONS_LIMIT),
+    retry: false,
+  })
+  const transactionHistoryQuery = useQuery({
+    queryKey: queryKeys.transactions(TRANSACTION_HISTORY_LIMIT),
+    queryFn: ({ signal }) =>
+      fetchTransactions(signal, TRANSACTION_HISTORY_LIMIT),
+    enabled: historyRequested,
     retry: false,
   })
   const preferences = usePreferences(customerQuery.data?.customer.segment)
@@ -393,8 +516,23 @@ export default function Dashboard({ onNewTransfer }: DashboardProps) {
         <DashboardContent
           accounts={accountsQuery.data.accounts}
           customer={customerQuery.data.customer}
-          transactions={transactionsQuery.data.transactions}
+          historyError={
+            transactionHistoryQuery.isError && !transactionHistoryQuery.data
+          }
+          historyLoading={transactionHistoryQuery.isFetching}
+          transactions={
+            transactionHistoryQuery.data?.transactions ??
+            transactionsQuery.data.transactions
+          }
+          transactionsTotal={
+            transactionHistoryQuery.data?.total ?? transactionsQuery.data.total
+          }
+          viewingHistory={Boolean(transactionHistoryQuery.data)}
           onNewTransfer={onNewTransfer}
+          onRetryHistory={() => {
+            void transactionHistoryQuery.refetch()
+          }}
+          onViewHistory={() => setHistoryRequested(true)}
         />
       ) : null}
     </div>
